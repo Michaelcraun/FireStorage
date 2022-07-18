@@ -2,6 +2,9 @@ import Firebase
 import Foundation
 
 public struct FireStorage {
+    static let databse = Database()
+    static let firestore = Firestore()
+    
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {
         switch environment {
