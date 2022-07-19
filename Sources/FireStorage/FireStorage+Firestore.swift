@@ -99,6 +99,7 @@ extension CollectionReference {
     public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
     public typealias FirestorePutCompletion = (DocumentReference?, Error?) -> Void
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
+    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
     public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping FirestoreGetCompletion<T>) {
         self.document(id).getDocument { snapshot, error in
@@ -146,6 +147,80 @@ extension CollectionReference {
                 FirebaseStorage.firestore.registerError(message: error.localizedDescription)
             }
             completion?(error)
+        }
+    }
+    
+    public func observeChildren<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
+        self.addSnapshotListener { snapshot, error in
+            if let error = error {
+                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                completion(nil, nil, nil, error)
+            } else if let snapshot = snapshot {
+                var new: [T] = []
+                var updated: [T] = []
+                var removed: [T] = []
+                
+                for change in snapshot.documentChanges {
+                    let data = change.document.data()
+                    
+                    do {
+                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                        let object = try JSONDecoder().decode(type, from: json)
+                        
+                        switch change.type {
+                        case .added: new.append(object)
+                        case .modified: updated.append(object)
+                        case .removed: removed.append(object)
+                        }
+                    } catch {
+                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    }
+                }
+                
+                completion(new, updated, removed, nil)
+            } else {
+                FirebaseStorage.firestore.registerError(message: "No data found [\(self.collectionID)]")
+                completion(nil, nil, nil, "No data found [\(self.collectionID)]")
+            }
+        }
+    }
+}
+
+extension Query {
+    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
+    
+    public func observe<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
+        self.addSnapshotListener { snapshot, error in
+            if let error = error {
+                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                completion(nil, nil, nil, error)
+            } else if let snapshot = snapshot {
+                var new: [T] = []
+                var updated: [T] = []
+                var removed: [T] = []
+                
+                for change in snapshot.documentChanges {
+                    let data = change.document.data()
+                    
+                    do {
+                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                        let object = try JSONDecoder().decode(type, from: json)
+                        
+                        switch change.type {
+                        case .added: new.append(object)
+                        case .modified: updated.append(object)
+                        case .removed: removed.append(object)
+                        }
+                    } catch {
+                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    }
+                }
+                
+                completion(new, updated, removed, nil)
+            } else {
+                FirebaseStorage.firestore.registerError(message: "No data found [\(self.description)]")
+                completion(nil, nil, nil, "No data found [\(self.description)]")
+            }
         }
     }
 }
