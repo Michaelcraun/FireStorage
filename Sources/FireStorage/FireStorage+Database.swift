@@ -8,8 +8,8 @@
 import Foundation
 import FirebaseDatabase
 
-extension FireStorage {
-    struct Database {
+extension FirebaseStorage {
+    public struct Database {
         public var reference: DatabaseReference { FirebaseDatabase.Database.database().reference() }
         
         // MARK: - Database
@@ -23,25 +23,33 @@ extension FireStorage {
         public var traits: DatabaseReference { core.child("trait") }
         public var weapons: DatabaseReference { core.child("weapon") }
         
-        // MARK: - Public
+        // MARK: - Application
         public var `public`: DatabaseReference { reference.child("public") }
+        public var errors: DatabaseReference { reference.child("error") }
         
         // MARK: - Users
         public var users: DatabaseReference { reference.child("users") }
         public func profile(uid: String) -> DatabaseReference {
             return users.child(uid)
         }
+        
+        // MARK: - Characters
+        public var characters: DatabaseReference { reference.child("character") }
     }
 }
 
 extension DatabaseReference {
-    public func get<T:Codable>(dataWithId id: String, completion: @escaping (T?, Error?) -> Void) {
+    public typealias DatabaseGetCompletion<T:Codable> = (T?, Error?) -> Void
+    public typealias DatabasePutCompletion = (DatabaseReference?, Error?) -> Void
+    public typealias DatabaseRemoveCompletion = (Error?) -> Void
+    
+    public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping DatabaseGetCompletion<T>) {
         self.child(id).observeSingleEvent(of: .value) { snapshot in
             guard let value = snapshot.value else { return completion(nil, "No data available") }
             
             do {
                 let json = try JSONSerialization.data(withJSONObject: value, options: .prettyPrinted)
-                let data = try JSONDecoder().decode(T.self, from: json)
+                let data = try JSONDecoder().decode(type, from: json)
                 completion(data, nil)
             } catch {
                 completion(nil, error)
@@ -49,7 +57,7 @@ extension DatabaseReference {
         }
     }
     
-    public func put<T:Codable>(data: T, forId id: String, completion: ((DatabaseReference?, Error?) -> Void)? = nil) {
+    public func put<T:Codable>(data: T, forId id: String, completion: DatabasePutCompletion? = nil) {
         do {
             let encoded = try JSONEncoder().encode(data)
             if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
@@ -62,7 +70,7 @@ extension DatabaseReference {
         }
     }
     
-    public func remove(id: String, completion: ((Error?) -> Void)? = nil) {
+    public func remove(id: String, completion: DatabaseRemoveCompletion? = nil) {
         self.child(id).removeValue { error, reference in
             completion?(error)
         }
@@ -70,7 +78,9 @@ extension DatabaseReference {
 }
 
 extension DatabaseQuery {
-    public func observe(_ eventType: DataEventType, completion: @escaping (DataSnapshot) -> Void) {
+    public typealias DatabaseObserveCompletion = (DataSnapshot) -> Void
+    
+    public func observe(_ eventType: DataEventType, completion: @escaping DatabaseObserveCompletion) {
         self.removeAllObservers()
         self.observe(eventType, with: completion)
     }

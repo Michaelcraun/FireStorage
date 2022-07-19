@@ -1,9 +1,9 @@
 import Firebase
 import Foundation
 
-public struct FireStorage {
-    static let databse = Database()
-    static let firestore = Firestore()
+public struct FirebaseStorage {
+    public static let database = Database()
+    public static let firestore = Firestore()
     
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {

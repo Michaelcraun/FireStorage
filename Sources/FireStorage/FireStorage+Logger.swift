@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension FireStorage {
+extension FirebaseStorage {
     func printDebug(_ message: String) {
         #if DEBUG
         print("FireStorage:", message)
