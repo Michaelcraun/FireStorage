@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension FirebaseStorage {
+extension Store {
     public struct Logger {
         
     }

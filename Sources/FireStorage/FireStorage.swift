@@ -1,32 +1,35 @@
 import Firebase
 import Foundation
 
-public struct FirebaseStorage {
-    public static let database = Database()
-    public static let firestore = Firestore()
+public struct Store {
+    public static let database = Store.Database()
+    public static let firestore = Store.Firestore()
+    public static let storage = Store.Storage()
+    
+    public static var maxDownloadMegabytes: Int = 5
     
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {
         switch environment {
         case .development, .testing:
-            FirebaseStorage.printDebug("This application is currently running in development!")
+            Store.printDebug("This application is currently running in development!")
             if let devPlist = devPlist {
                 if let options = loadGooglePlist(named: devPlist) {
                     FirebaseApp.configure(options: options)
                 } else {
-                    FirebaseStorage.printDebug("WARNING: Could not load the development Google Service plist!")
+                    Store.printDebug("WARNING: Could not load the development Google Service plist!")
                     startInProductionByDefault()
                 }
             } else {
-                FirebaseStorage.printDebug("WARNING: No development Google Service plist was provided!")
+                Store.printDebug("WARNING: No development Google Service plist was provided!")
                 startInProductionByDefault()
             }
         default:
-            FirebaseStorage.printDebug("This application is currently running in production!")
+            Store.printDebug("This application is currently running in production!")
             if let options = loadGooglePlist(named: plist) {
                 FirebaseApp.configure(options: options)
             } else {
-                FirebaseStorage.printDebug("WARNING: Could not load the production Google Service plist!")
+                Store.printDebug("WARNING: Could not load the production Google Service plist!")
                 startInProductionByDefault()
             }
         }
@@ -55,7 +58,7 @@ public struct FirebaseStorage {
     }
     
     func startInProductionByDefault() {
-        FirebaseStorage.printDebug("WARNING: This application is currently using the production database!")
+        Store.printDebug("WARNING: This application is currently using the production database!")
         FirebaseApp.configure()
     }
 }

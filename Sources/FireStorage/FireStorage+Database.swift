@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseDatabase
 
-extension FirebaseStorage {
+extension Store {
     public struct Database {
         public var reference: DatabaseReference { FirebaseDatabase.Database.database().reference() }
         
@@ -50,11 +50,11 @@ extension DatabaseReference {
                     let data = try JSONDecoder().decode(type, from: json)
                     completion(data, nil)
                 } catch {
-                    FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
                 }
             } else {
-                FirebaseStorage.firestore.registerError(message: "No data available [\(id)]")
+                Store.firestore.registerError(message: "No data available [\(id)]")
             }
         }
     }
@@ -65,7 +65,7 @@ extension DatabaseReference {
             if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
                 self.child(id).updateChildValues(json) { error, reference in
                     if let error = error {
-                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                        Store.firestore.registerError(message: error.localizedDescription)
                     }
                     completion?(reference, error)
                 }
@@ -78,7 +78,7 @@ extension DatabaseReference {
     public func remove(id: String, completion: DatabaseRemoveCompletion? = nil) {
         self.child(id).removeValue { error, reference in
             if let error = error {
-                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                Store.firestore.registerError(message: error.localizedDescription)
             }
             completion?(error)
         }

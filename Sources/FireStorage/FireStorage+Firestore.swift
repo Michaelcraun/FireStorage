@@ -7,7 +7,7 @@
 
 import FirebaseFirestore
 
-extension FirebaseStorage {
+extension Store {
     /* Firestore data structure
      * + NPCGen5e
      * +-> account
@@ -74,10 +74,10 @@ extension FirebaseStorage {
             
             errors.put(data: error) { reference, error in
                 if let error = error {
-                    FirebaseStorage.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
+                    Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
                     completion?(error)
                 } else if let reference = reference {
-                    FirebaseStorage.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
+                    Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
                     completion?(nil)
                 }
             }
@@ -85,7 +85,7 @@ extension FirebaseStorage {
     }
 }
 
-extension FirebaseStorage.Firestore {
+extension Store.Firestore {
     private struct FirestoreError: Codable {
         var error: String
         var file: String
@@ -104,7 +104,7 @@ extension CollectionReference {
     public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping FirestoreGetCompletion<T>) {
         self.document(id).getDocument { snapshot, error in
             if let error = error {
-                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, error)
             } else if let data = snapshot?.data() {
                 do {
@@ -112,11 +112,11 @@ extension CollectionReference {
                     let value = try JSONDecoder().decode(type, from: json)
                     completion(value, nil)
                 } catch {
-                    FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
                 }
             } else {
-                FirebaseStorage.firestore.registerError(message: "No data available [\(id)]")
+                Store.firestore.registerError(message: "No data available [\(id)]")
                 completion(nil, "No data available [\(id)]")
             }
         }
@@ -131,7 +131,7 @@ extension CollectionReference {
             if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
                 document.setData(json, merge: true) { error in
                     if let error = error {
-                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                        Store.firestore.registerError(message: error.localizedDescription)
                     }
                     completion?(document, error)
                 }
@@ -144,7 +144,7 @@ extension CollectionReference {
     public func remove(id: String, completion: FirestoreRemoveCompletion? = nil) {
         self.document(id).delete { error in
             if let error = error {
-                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                Store.firestore.registerError(message: error.localizedDescription)
             }
             completion?(error)
         }
@@ -153,7 +153,7 @@ extension CollectionReference {
     public func observeChildren<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
-                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
                 var new: [T] = []
@@ -173,13 +173,13 @@ extension CollectionReference {
                         case .removed: removed.append(object)
                         }
                     } catch {
-                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                        Store.firestore.registerError(message: error.localizedDescription)
                     }
                 }
                 
                 completion(new, updated, removed, nil)
             } else {
-                FirebaseStorage.firestore.registerError(message: "No data found [\(self.collectionID)]")
+                Store.firestore.registerError(message: "No data found [\(self.collectionID)]")
                 completion(nil, nil, nil, "No data found [\(self.collectionID)]")
             }
         }
@@ -192,7 +192,7 @@ extension Query {
     public func observe<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
-                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
                 var new: [T] = []
@@ -212,13 +212,13 @@ extension Query {
                         case .removed: removed.append(object)
                         }
                     } catch {
-                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                        Store.firestore.registerError(message: error.localizedDescription)
                     }
                 }
                 
                 completion(new, updated, removed, nil)
             } else {
-                FirebaseStorage.firestore.registerError(message: "No data found [\(self.description)]")
+                Store.firestore.registerError(message: "No data found [\(self.description)]")
                 completion(nil, nil, nil, "No data found [\(self.description)]")
             }
         }
