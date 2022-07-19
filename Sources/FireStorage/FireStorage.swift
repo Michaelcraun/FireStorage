@@ -2,6 +2,7 @@ import Firebase
 import Foundation
 
 public struct Store {
+    public static let auth = Store.Auth()
     public static let database = Store.Database()
     public static let firestore = Store.Firestore()
     public static let storage = Store.Storage()
@@ -39,6 +40,10 @@ public struct Store {
         #if DEBUG
         print("FireStorage:", message)
         #endif
+    }
+    
+    public static func endAllObservers() {
+        #warning("TODO: Implement!")
     }
     
     func loadGooglePlist(named name: String) -> FirebaseOptions? {

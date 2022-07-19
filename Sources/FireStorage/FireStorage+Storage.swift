@@ -19,7 +19,11 @@ extension Store {
 }
 
 extension StorageReference {
-    public func get(id: String, completion: @escaping (Data?, Error?) -> Void) {
+    public typealias StorageGetCompletion = (Data?, Error?) -> Void
+    public typealias StoragePutCompletion = (Error?) -> Void
+    public typealias StorageRemoveCompletion = StoragePutCompletion
+    
+    public func get(id: String, completion: @escaping StorageGetCompletion) {
         self.child(id).getData(maxSize: Int64(Store.maxDownloadMegabytes * 1024 * 1024)) { data, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -30,7 +34,7 @@ extension StorageReference {
         }
     }
     
-    public func put(data: Data, withId id: String, completion: ((Error?) -> Void)? = nil) {
+    public func put(data: Data, withId id: String, completion: StoragePutCompletion? = nil) {
         self.child(id).putData(data) { metadata, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -39,7 +43,7 @@ extension StorageReference {
         }
     }
     
-    public func remove(id: String, completion: ((Error?) -> Void)? = nil) {
+    public func remove(id: String, completion: StorageRemoveCompletion? = nil) {
         self.child(id).delete { error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
