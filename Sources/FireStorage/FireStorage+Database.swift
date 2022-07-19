@@ -25,7 +25,6 @@ extension FirebaseStorage {
         
         // MARK: - Application
         public var `public`: DatabaseReference { reference.child("public") }
-        public var errors: DatabaseReference { reference.child("error") }
         
         // MARK: - Users
         public var users: DatabaseReference { reference.child("users") }
@@ -45,14 +44,17 @@ extension DatabaseReference {
     
     public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping DatabaseGetCompletion<T>) {
         self.child(id).observeSingleEvent(of: .value) { snapshot in
-            guard let value = snapshot.value else { return completion(nil, "No data available") }
-            
-            do {
-                let json = try JSONSerialization.data(withJSONObject: value, options: .prettyPrinted)
-                let data = try JSONDecoder().decode(type, from: json)
-                completion(data, nil)
-            } catch {
-                completion(nil, error)
+            if let value = snapshot.value as? [String : Any] {
+                do {
+                    let json = try JSONSerialization.data(withJSONObject: value, options: .prettyPrinted)
+                    let data = try JSONDecoder().decode(type, from: json)
+                    completion(data, nil)
+                } catch {
+                    FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    completion(nil, error)
+                }
+            } else {
+                FirebaseStorage.firestore.registerError(message: "No data available [\(id)]")
             }
         }
     }
@@ -62,6 +64,9 @@ extension DatabaseReference {
             let encoded = try JSONEncoder().encode(data)
             if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
                 self.child(id).updateChildValues(json) { error, reference in
+                    if let error = error {
+                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    }
                     completion?(reference, error)
                 }
             }
@@ -72,6 +77,9 @@ extension DatabaseReference {
     
     public func remove(id: String, completion: DatabaseRemoveCompletion? = nil) {
         self.child(id).removeValue { error, reference in
+            if let error = error {
+                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+            }
             completion?(error)
         }
     }

@@ -8,9 +8,7 @@
 import Foundation
 
 extension FirebaseStorage {
-    func printDebug(_ message: String) {
-        #if DEBUG
-        print("FireStorage:", message)
-        #endif
+    public struct Logger {
+        
     }
 }

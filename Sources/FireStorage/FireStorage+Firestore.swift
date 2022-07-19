@@ -36,6 +36,8 @@ extension FirebaseStorage {
      */
     
     public struct Firestore {
+        public typealias FirestoreErrorCompletion = (Error?) -> Void
+        
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         
         // MARK: - Users
@@ -61,6 +63,35 @@ extension FirebaseStorage {
         public var products: CollectionReference { firestore.collection("product") }
         public var `public`: CollectionReference { firestore.collection("public") }
         public var purchases: CollectionReference { firestore.collection("purchase") }
+        
+        public func registerError(message: String, file: String = #file, function: String = #function, line: Int = #line, completion: FirestoreErrorCompletion? = nil) {
+            let error = FirestoreError(
+                error: message,
+                file: URL(fileURLWithPath: file).lastPathComponent,
+                function: function,
+                line: line,
+                date: Date().description)
+            
+            errors.put(data: error) { reference, error in
+                if let error = error {
+                    FirebaseStorage.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
+                    completion?(error)
+                } else if let reference = reference {
+                    FirebaseStorage.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
+                    completion?(nil)
+                }
+            }
+        }
+    }
+}
+
+extension FirebaseStorage.Firestore {
+    private struct FirestoreError: Codable {
+        var error: String
+        var file: String
+        var function: String
+        var line: Int
+        var date: String
     }
 }
 
@@ -72,6 +103,7 @@ extension CollectionReference {
     public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping FirestoreGetCompletion<T>) {
         self.document(id).getDocument { snapshot, error in
             if let error = error {
+                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
                 completion(nil, error)
             } else if let data = snapshot?.data() {
                 do {
@@ -79,18 +111,27 @@ extension CollectionReference {
                     let value = try JSONDecoder().decode(type, from: json)
                     completion(value, nil)
                 } catch {
+                    FirebaseStorage.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
                 }
+            } else {
+                FirebaseStorage.firestore.registerError(message: "No data available [\(id)]")
+                completion(nil, "No data available [\(id)]")
             }
         }
     }
     
-    public func put<T:Codable>(data: T, forId id: String, completion: FirestorePutCompletion? = nil) {
+    public func put<T:Codable>(data: T, forId id: String? = nil, completion: FirestorePutCompletion? = nil) {
+        let documentId = id ?? self.document().documentID
+        let document = self.document(documentId)
+        
         do {
             let encoded = try JSONEncoder().encode(data)
             if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
-                let document = self.document(id)
                 document.setData(json, merge: true) { error in
+                    if let error = error {
+                        FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+                    }
                     completion?(document, error)
                 }
             }
@@ -100,6 +141,11 @@ extension CollectionReference {
     }
     
     public func remove(id: String, completion: FirestoreRemoveCompletion? = nil) {
-        self.document(id).delete(completion: completion)
+        self.document(id).delete { error in
+            if let error = error {
+                FirebaseStorage.firestore.registerError(message: error.localizedDescription)
+            }
+            completion?(error)
+        }
     }
 }
