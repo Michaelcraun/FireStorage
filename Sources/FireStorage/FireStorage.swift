@@ -3,8 +3,11 @@ import Foundation
 
 public struct Store {
     public static let auth = Store.Auth()
+    public static let crashlytics = Store.Crashlytics()
     public static let database = Store.Database()
     public static let firestore = Store.Firestore()
+    public static let functions = Store.Functions()
+    public static var messaging = Store.Messaging()
     public static let storage = Store.Storage()
     
     public static var maxDownloadMegabytes: Int = 5
