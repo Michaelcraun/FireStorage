@@ -36,31 +36,17 @@ public class AppUser: Codable {
         return "\(first) \(last)"
     }
     
-    init(email: String?, password: String?, userData: [String : Any]) {
+    public required init(email: String?, uid: String?, userData: [String : Any]) {
         self.email = email
-    }
-    
-    public func deleteAllData(completion: @escaping (Error?) -> Void) {  }
-}
-
-class NPCGenUser: AppUser {
-    func test() {
-        Store.auth.remove(user: self) { error in
-            
-        }
-    }
-    
-    override init(email: String?, password: String?, userData: [String : Any]) {
-        super.init(email: email, password: password, userData: userData)
+        self.uid = uid
         
-        
+        self.first = userData["first"] as? String
+        self.last = userData["last"] as? String
+        self.photo = userData["photo"] as? String
+        self.username = userData["username"] as? String
     }
     
-    required init(from decoder: Decoder) throws {
-        fatalError("init(from:) has not been implemented")
-    }
-    
-    override func deleteAllData(completion: @escaping (Error?) -> Void) {
-        
+    public func deleteAllData(completion: @escaping (Error?) -> Void) {
+        completion(nil)
     }
 }

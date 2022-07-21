@@ -43,7 +43,8 @@ public struct Store {
     }
     
     public static func endAllObservers() {
-        #warning("TODO: Implement!")
+        database.endAllObservers()
+        firestore.endAllObservers()
     }
     
     func loadGooglePlist(named name: String) -> FirebaseOptions? {

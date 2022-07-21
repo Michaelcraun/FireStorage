@@ -42,7 +42,6 @@ extension Store {
         
         // MARK: - Users
         public var accounts: CollectionReference { firestore.collection("account") }
-        public func account(uid: String) -> DocumentReference { return accounts.document(uid) }
         
         // MARK: - Database
         public var actions: CollectionReference { firestore.collection("action") }
@@ -64,24 +63,33 @@ extension Store {
         public var `public`: CollectionReference { firestore.collection("public") }
         public var purchases: CollectionReference { firestore.collection("purchase") }
         
-        public func registerError(message: String, file: String = #file, function: String = #function, line: Int = #line, completion: FirestoreErrorCompletion? = nil) {
-            let error = FirestoreError(
-                error: message,
-                file: URL(fileURLWithPath: file).lastPathComponent,
-                function: function,
-                line: line,
-                date: Date().description)
+        public func endAllObservers() {
             
-            errors.put(data: error) { reference, error in
-                if let error = error {
-                    Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
-                    completion?(error)
-                } else if let reference = reference {
-                    Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
-                    completion?(nil)
+        }
+        
+        public func registerError(
+            message: String,
+            file: String = #file,
+            function: String = #function,
+            line: Int = #line,
+            completion: FirestoreErrorCompletion? = nil) {
+                let error = FirestoreError(
+                    error: message,
+                    file: URL(fileURLWithPath: file).lastPathComponent,
+                    function: function,
+                    line: line,
+                    date: Date().description)
+                
+                errors.put(data: error) { reference, error in
+                    if let error = error {
+                        Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
+                        completion?(error)
+                    } else if let reference = reference {
+                        Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
+                        completion?(nil)
+                    }
                 }
             }
-        }
     }
 }
 
@@ -101,7 +109,10 @@ extension CollectionReference {
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
-    public func get<T:Codable>(dataWithId id: String, ofType type: T.Type, completion: @escaping FirestoreGetCompletion<T>) {
+    public func get<T:Codable>(
+        dataWithId id: String,
+        ofType type: T.Type,
+        completion: @escaping FirestoreGetCompletion<T>) {
         self.document(id).getDocument { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -122,7 +133,10 @@ extension CollectionReference {
         }
     }
     
-    public func put<T:Codable>(data: T, forId id: String? = nil, completion: FirestorePutCompletion? = nil) {
+    public func put<T:Codable>(
+        data: T,
+        forId id: String? = nil,
+        completion: FirestorePutCompletion? = nil) {
         let documentId = id ?? self.document().documentID
         let document = self.document(documentId)
         
@@ -141,7 +155,9 @@ extension CollectionReference {
         }
     }
     
-    public func remove(id: String, completion: FirestoreRemoveCompletion? = nil) {
+    public func remove(
+        id: String,
+        completion: FirestoreRemoveCompletion? = nil) {
         self.document(id).delete { error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -150,7 +166,9 @@ extension CollectionReference {
         }
     }
     
-    public func observeChildren<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
+    public func observeChildren<T:Codable>(
+        dataOfType type: T.Type,
+        completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -189,7 +207,9 @@ extension CollectionReference {
 extension Query {
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
-    public func observe<T:Codable>(dataOfType type: T.Type, completion: @escaping FirestoreObserveCompletion<T>) {
+    public func observe<T:Codable>(
+        dataOfType type: T.Type,
+        completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
