@@ -45,7 +45,7 @@ extension Store {
         
         // MARK: - Database
         public var actions: CollectionReference { firestore.collection("action") }
-        public var armors: CollectionReference { firestore.collection("armors") }
+        public var armors: CollectionReference { firestore.collection("armor") }
         public var details: CollectionReference { firestore.collection("detail") }
         public var levelDatas: CollectionReference { firestore.collection("levelData") }
         public var occupations: CollectionReference { firestore.collection("occupation") }
