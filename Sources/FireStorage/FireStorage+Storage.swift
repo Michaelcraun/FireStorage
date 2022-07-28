@@ -34,8 +34,8 @@ extension StorageReference {
         }
     }
     
-    public func put(data: Data, withId id: String, completion: StoragePutCompletion? = nil) {
-        self.child(id).putData(data) { metadata, error in
+    public func put(data: Data, with name: String, completion: StoragePutCompletion? = nil) {
+        self.child(name).putData(data) { metadata, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
             }

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public class AppUser: Codable {
+open class AppUser: Codable {
     public var email: String?
     public var first: String?
     public var last: String?

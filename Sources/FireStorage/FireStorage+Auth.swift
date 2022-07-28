@@ -16,7 +16,7 @@ extension Store {
         public typealias AuthSignInCompletion<T:AppUser> = (T?, Error?) -> Void
         public typealias AuthSignUpCompletion<T:AppUser> = (T?, Error?) -> Void
         public typealias AuthSignOutCompletion = (Error?) -> Void
-        public typealias AuthUserDataCompletion = (AppUser?, Error?) -> Void
+        public typealias AuthUserDataCompletion<T:AppUser> = (T?, Error?) -> Void
         
         private var auth: FirebaseAuth.Auth { FirebaseAuth.Auth.auth() }
         private var currentNonce: String?
@@ -55,7 +55,7 @@ extension Store {
         
         public func getUser<T:AppUser>(
             dataWithType type: T.Type,
-            completion:AuthUserDataCompletion? = nil) {
+            completion:AuthUserDataCompletion<T>? = nil) {
                 if let currentUser = currentUser {
                     Store.firestore.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
                         if let error = error {
@@ -114,7 +114,7 @@ extension Store {
                         completion(nil, error)
                     } else {
                         self.getUser(dataWithType: type) { user, error in
-                            completion(user as? T, error)
+                            completion(user, error)
                         }
                     }
                 }
@@ -142,7 +142,7 @@ extension Store {
                             let user = T(email: email, uid: uid, userData: userData)
                             Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
                                 self.getUser(dataWithType: type) { user, error in
-                                    completion(user as? T, error)
+                                    completion(user, error)
                                 }
                             }
                         } else {
@@ -171,7 +171,7 @@ extension Store {
                         let user = T(email: email, uid: result.user.uid, userData: userData)
                         Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
                             self.getUser(dataWithType: type) { user, error in
-                                completion(user as? T, error)
+                                completion(user, error)
                             }
                         }
                     } else {

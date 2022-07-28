@@ -16,14 +16,10 @@ extension Store {
         public typealias MessagingTokenCompletion = (String?, Error?) -> Void
         
         private var messaging: FirebaseMessaging.Messaging { FirebaseMessaging.Messaging.messaging() }
-        private var application: UIApplication?
         private var delegate: (UNUserNotificationCenterDelegate & MessagingDelegate)?
 //        private var serverKey: String?
         
-        public mutating func set<T:UNUserNotificationCenterDelegate & MessagingDelegate>(
-            application: UIApplication,
-            and delegate: T) {
-                self.application = application
+        public mutating func set<T:UNUserNotificationCenterDelegate & MessagingDelegate>(delegate: T) {
                 self.delegate = delegate
             }
         
@@ -38,10 +34,10 @@ extension Store {
         public func registerForRemoteNotificationsWith(
             options: UNAuthorizationOptions = [.alert, .badge, .sound],
             completion: @escaping MessagingAuthorizationCompletion) {
-                guard let application = application, let delegate = delegate else {
-                    Store.firestore.registerError(message: "\(#function) was called before application and/or delegate was set")
-                    Store.printDebug("\(#function) was called before application and/or delegate was set! Please call set(delegate:) before continuing.")
-                    return completion(false, "\(#function) was called before application and/or delegate was set")
+                guard let delegate = delegate else {
+                    Store.firestore.registerError(message: "\(#function) was called before delegate was set")
+                    Store.printDebug("\(#function) was called before delegate was set! Please call set(delegate:) before continuing.")
+                    return completion(false, "\(#function) was called before delegate was set")
                 }
                 
                 messaging.delegate = delegate
@@ -54,7 +50,6 @@ extension Store {
                         Store.firestore.registerError(message: "user did not allow notifications")
                         completion(false, nil)
                     } else {
-                        application.registerForRemoteNotifications()
                         setNotificationCategories()
                         completion(true, nil)
                     }

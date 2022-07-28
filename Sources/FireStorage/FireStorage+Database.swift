@@ -52,8 +52,33 @@ extension Store {
 
 extension DatabaseReference {
     public typealias DatabaseGetCompletion<T:Codable> = (T?, Error?) -> Void
+    public typealias DatabaseGetAllCompletion<T:Codable> = ([T]?, Error?) -> Void
     public typealias DatabasePutCompletion = (DatabaseReference?, Error?) -> Void
     public typealias DatabaseRemoveCompletion = (Error?) -> Void
+    
+    public func getAll<T:Codable>(ofType type: T.Type, completion: @escaping DatabaseGetAllCompletion<T>) {
+        self.observeSingleEvent(of: .value) { snapshot in
+            var objects: [T] = []
+            
+            if let snapshots = snapshot.children.allObjects as? [DataSnapshot] {
+                for snapshot in snapshots {
+                    do {
+                        let json = try JSONSerialization.data(withJSONObject: snapshot.value as Any, options: .prettyPrinted)
+                        let object = try JSONDecoder().decode(T.self, from: json)
+                        objects.append(object)
+                        
+                        if snapshot == snapshots.last {
+                            completion(objects, nil)
+                        }
+                    } catch {
+                        Store.printDebug("could not decode document [\(snapshot.ref.url)]")
+                    }
+                }
+            } else {
+                Store.printDebug("unable to find data [\(self.url)]")
+            }
+        }
+    }
     
     public func get<T:Codable>(
         dataWithId id: String,

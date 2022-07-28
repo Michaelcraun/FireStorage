@@ -2,7 +2,7 @@ import Firebase
 import Foundation
 
 public struct Store {
-    public static let auth = Store.Auth()
+    public static var auth = Store.Auth()
     public static let crashlytics = Store.Crashlytics()
     public static let database = Store.Database()
     public static let firestore = Store.Firestore()
