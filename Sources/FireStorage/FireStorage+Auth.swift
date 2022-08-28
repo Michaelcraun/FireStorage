@@ -53,11 +53,10 @@ extension Store {
             return hashString
         }
         
-        public func getUser<T:AppUser>(
-            dataWithType type: T.Type,
+        public func getUser(
             completion:AuthUserDataCompletion? = nil) {
                 if let currentUser = currentUser {
-                    Store.firestore.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
+                    Store.firestore.accounts.get(dataWithId: currentUser.uid) { data, error in
                         if let error = error {
                             Store.firestore.registerError(message: error.localizedDescription)
                             completion?(nil, error)
@@ -103,17 +102,16 @@ extension Store {
                 }
             }
         
-        public func signInWith<T:AppUser>(
+        public func signInWith(
             email: String,
             password: String,
-            type: T.Type,
             completion: @escaping AuthSignInCompletion) {
                 auth.signIn(withEmail: email, password: password) { result, error in
                     if let error = error {
                         Store.firestore.registerError(message: error.localizedDescription)
                         completion(nil, error)
                     } else {
-                        self.getUser(dataWithType: type) { user, error in
+                        self.getUser { user, error in
                             completion(user, error)
                         }
                     }
@@ -141,7 +139,7 @@ extension Store {
                             ]
                             let user = T(email: email, uid: uid, userData: userData)
                             Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
-                                self.getUser(dataWithType: type) { user, error in
+                                self.getUser { user, error in
                                     completion(user, error)
                                 }
                             }
@@ -169,7 +167,7 @@ extension Store {
                     } else if let result = result {
                         let user = T(email: email, uid: result.user.uid, userData: userData)
                         Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
-                            self.getUser(dataWithType: type) { user, error in
+                            self.getUser { user, error in
                                 completion(user, error)
                             }
                         }

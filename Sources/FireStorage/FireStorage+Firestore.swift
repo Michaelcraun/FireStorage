@@ -111,8 +111,7 @@ extension CollectionReference {
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
     public typealias FirestoreObserveCompletion = ([Data]?, [Data]?, [Data]?, Error?) -> Void
     
-    public func get<T:Codable>(
-        ofType type: T.Type,
+    public func get(
         completion: @escaping FirestoreGetArrayCompletion) {
             self.getDocuments { snapshot, error in
                 if let error = error {
@@ -143,28 +142,27 @@ extension CollectionReference {
             }
         }
     
-    public func get<T:Codable>(
+    public func get(
         dataWithId id: String,
-        ofType type: T.Type,
         completion: @escaping FirestoreGetCompletion) {
-        self.document(id).getDocument { snapshot, error in
-            if let error = error {
-                Store.firestore.registerError(message: error.localizedDescription)
-                completion(nil, error)
-            } else if let data = snapshot?.data() {
-                do {
-                    let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                    completion(json, nil)
-                } catch {
+            self.document(id).getDocument { snapshot, error in
+                if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
+                } else if let data = snapshot?.data() {
+                    do {
+                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                        completion(json, nil)
+                    } catch {
+                        Store.firestore.registerError(message: error.localizedDescription)
+                        completion(nil, error)
+                    }
+                } else {
+                    Store.firestore.registerError(message: "No data available [\(id)]")
+                    completion(nil, "No data available [\(id)]")
                 }
-            } else {
-                Store.firestore.registerError(message: "No data available [\(id)]")
-                completion(nil, "No data available [\(id)]")
             }
         }
-    }
     
     public func put<T:Codable>(
         data: T,
@@ -199,8 +197,7 @@ extension CollectionReference {
         }
     }
     
-    public func observeChildren<T:Codable>(
-        dataOfType type: T.Type,
+    public func observeChildren(
         completion: @escaping FirestoreObserveCompletion) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
@@ -237,31 +234,29 @@ extension CollectionReference {
 }
 
 extension Query {
-    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
+    public typealias FirestoreObserveCompletion = ([Data]?, [Data]?, [Data]?, Error?) -> Void
     
-    public func observe<T:Codable>(
-        dataOfType type: T.Type,
-        completion: @escaping FirestoreObserveCompletion<T>) {
+    public func observe(
+        completion: @escaping FirestoreObserveCompletion) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
-                var new: [T] = []
-                var updated: [T] = []
-                var removed: [T] = []
+                var new: [Data] = []
+                var updated: [Data] = []
+                var removed: [Data] = []
                 
                 for change in snapshot.documentChanges {
                     let data = change.document.data()
                     
                     do {
                         let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                        let object = try JSONDecoder().decode(type, from: json)
                         
                         switch change.type {
-                        case .added: new.append(object)
-                        case .modified: updated.append(object)
-                        case .removed: removed.append(object)
+                        case .added: new.append(json)
+                        case .modified: updated.append(json)
+                        case .removed: removed.append(json)
                         }
                     } catch {
                         Store.firestore.registerError(message: error.localizedDescription)
