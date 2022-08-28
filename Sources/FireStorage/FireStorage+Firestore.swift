@@ -37,7 +37,6 @@ extension Store {
     
     public struct Firestore {
         public typealias FirestoreErrorCompletion = (Error?) -> Void
-        public typealias FirestoreCompendiumCompletion = (Error?) -> Void
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         
@@ -105,24 +104,26 @@ extension Store.Firestore {
 }
 
 extension CollectionReference {
-    public typealias FirestoreGetCompletion = (Data?, Error?) -> Void
-    public typealias FirestoreGetArrayCompletion = ([Data]?, Error?) -> Void
+    public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
+    public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
     public typealias FirestorePutCompletion = (DocumentReference?, Error?) -> Void
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
-    public typealias FirestoreObserveCompletion = ([Data]?, [Data]?, [Data]?, Error?) -> Void
+    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
-    public func get(
-        completion: @escaping FirestoreGetArrayCompletion) {
+    public func get<T:Codable>(
+        ofType type: T.Type,
+        completion: @escaping FirestoreGetArrayCompletion<T>) {
             self.getDocuments { snapshot, error in
                 if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
                 } else if let snapshot = snapshot {
                     var errors: [String] = []
-                    let objects: [Data] = snapshot.documents.compactMap({
+                    let objects: [T] = snapshot.documents.compactMap({
                         do {
                             let json = try JSONSerialization.data(withJSONObject: $0, options: .prettyPrinted)
-                            return json
+                            let value = try JSONDecoder().decode(type, from: json)
+                            return value
                         } catch {
                             errors.append(error.localizedDescription)
                             return nil
@@ -142,27 +143,29 @@ extension CollectionReference {
             }
         }
     
-    public func get(
+    public func get<T:Codable>(
         dataWithId id: String,
-        completion: @escaping FirestoreGetCompletion) {
-            self.document(id).getDocument { snapshot, error in
-                if let error = error {
+        ofType type: T.Type,
+        completion: @escaping FirestoreGetCompletion<T>) {
+        self.document(id).getDocument { snapshot, error in
+            if let error = error {
+                Store.firestore.registerError(message: error.localizedDescription)
+                completion(nil, error)
+            } else if let data = snapshot?.data() {
+                do {
+                    let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                    let value = try JSONDecoder().decode(type, from: json)
+                    completion(value, nil)
+                } catch {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
-                } else if let data = snapshot?.data() {
-                    do {
-                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                        completion(json, nil)
-                    } catch {
-                        Store.firestore.registerError(message: error.localizedDescription)
-                        completion(nil, error)
-                    }
-                } else {
-                    Store.firestore.registerError(message: "No data available [\(id)]")
-                    completion(nil, "No data available [\(id)]")
                 }
+            } else {
+                Store.firestore.registerError(message: "No data available [\(id)]")
+                completion(nil, "No data available [\(id)]")
             }
         }
+    }
     
     public func put<T:Codable>(
         data: T,
@@ -197,27 +200,29 @@ extension CollectionReference {
         }
     }
     
-    public func observeChildren(
-        completion: @escaping FirestoreObserveCompletion) {
+    public func observeChildren<T:Codable>(
+        dataOfType type: T.Type,
+        completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
-                var new: [Data] = []
-                var updated: [Data] = []
-                var removed: [Data] = []
+                var new: [T] = []
+                var updated: [T] = []
+                var removed: [T] = []
                 
                 for change in snapshot.documentChanges {
                     let data = change.document.data()
                     
                     do {
                         let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                        let object = try JSONDecoder().decode(type, from: json)
                         
                         switch change.type {
-                        case .added: new.append(json)
-                        case .modified: updated.append(json)
-                        case .removed: removed.append(json)
+                        case .added: new.append(object)
+                        case .modified: updated.append(object)
+                        case .removed: removed.append(object)
                         }
                     } catch {
                         Store.firestore.registerError(message: error.localizedDescription)
@@ -234,29 +239,31 @@ extension CollectionReference {
 }
 
 extension Query {
-    public typealias FirestoreObserveCompletion = ([Data]?, [Data]?, [Data]?, Error?) -> Void
+    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
-    public func observe(
-        completion: @escaping FirestoreObserveCompletion) {
+    public func observe<T:Codable>(
+        dataOfType type: T.Type,
+        completion: @escaping FirestoreObserveCompletion<T>) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
-                var new: [Data] = []
-                var updated: [Data] = []
-                var removed: [Data] = []
+                var new: [T] = []
+                var updated: [T] = []
+                var removed: [T] = []
                 
                 for change in snapshot.documentChanges {
                     let data = change.document.data()
                     
                     do {
                         let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                        let object = try JSONDecoder().decode(type, from: json)
                         
                         switch change.type {
-                        case .added: new.append(json)
-                        case .modified: updated.append(json)
-                        case .removed: removed.append(json)
+                        case .added: new.append(object)
+                        case .modified: updated.append(object)
+                        case .removed: removed.append(object)
                         }
                     } catch {
                         Store.firestore.registerError(message: error.localizedDescription)

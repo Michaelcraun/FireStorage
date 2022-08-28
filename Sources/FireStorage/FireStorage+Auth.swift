@@ -13,10 +13,10 @@ import FirebaseAuth
 extension Store {
     public struct Auth {
         public typealias AuthRemoveCompletion = (Error?) -> Void
-        public typealias AuthSignInCompletion = (Data?, Error?) -> Void
-        public typealias AuthSignUpCompletion = (Data?, Error?) -> Void
+        public typealias AuthSignInCompletion<T:AppUser> = (T?, Error?) -> Void
+        public typealias AuthSignUpCompletion<T:AppUser> = (T?, Error?) -> Void
         public typealias AuthSignOutCompletion = (Error?) -> Void
-        public typealias AuthUserDataCompletion = (Data?, Error?) -> Void
+        public typealias AuthUserDataCompletion<T:AppUser> = (T?, Error?) -> Void
         
         private var auth: FirebaseAuth.Auth { FirebaseAuth.Auth.auth() }
         private var currentNonce: String?
@@ -53,10 +53,11 @@ extension Store {
             return hashString
         }
         
-        public func getUser(
-            completion:AuthUserDataCompletion? = nil) {
+        public func getUser<T:AppUser>(
+            dataWithType type: T.Type,
+            completion:AuthUserDataCompletion<T>? = nil) {
                 if let currentUser = currentUser {
-                    Store.firestore.accounts.get(dataWithId: currentUser.uid) { data, error in
+                    Store.firestore.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
                         if let error = error {
                             Store.firestore.registerError(message: error.localizedDescription)
                             completion?(nil, error)
@@ -102,16 +103,17 @@ extension Store {
                 }
             }
         
-        public func signInWith(
+        public func signInWith<T:AppUser>(
             email: String,
             password: String,
-            completion: @escaping AuthSignInCompletion) {
+            type: T.Type,
+            completion: @escaping AuthSignInCompletion<T>) {
                 auth.signIn(withEmail: email, password: password) { result, error in
                     if let error = error {
                         Store.firestore.registerError(message: error.localizedDescription)
                         completion(nil, error)
                     } else {
-                        self.getUser { user, error in
+                        self.getUser(dataWithType: type) { user, error in
                             completion(user, error)
                         }
                     }
@@ -122,7 +124,7 @@ extension Store {
             apple credential: ASAuthorizationAppleIDCredential,
             nonce: String?,
             type: T.Type,
-            completion: @escaping AuthSignInCompletion) {
+            completion: @escaping AuthSignInCompletion<T>) {
                 if let appleToken = credential.identityToken, let token = String(data: appleToken, encoding: .utf8) {
                     let cred = OAuthProvider.credential(withProviderID: "apple.com", idToken: token, rawNonce: nonce)
                     auth.signIn(with: cred) { (result, error) in
@@ -139,7 +141,7 @@ extension Store {
                             ]
                             let user = T(email: email, uid: uid, userData: userData)
                             Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
-                                self.getUser { user, error in
+                                self.getUser(dataWithType: type) { user, error in
                                     completion(user, error)
                                 }
                             }
@@ -159,7 +161,8 @@ extension Store {
             password: String,
             userData: [String : Any],
             type: T.Type,
-            completion: @escaping AuthSignUpCompletion) {
+            completion: @escaping AuthSignUpCompletion<T>) {
+                #warning("TODO: Should I handle usernames here or should the app handle it?")
                 auth.createUser(withEmail: email, password: password) { result, error in
                     if let error = error {
                         Store.firestore.registerError(message: error.localizedDescription)
@@ -167,7 +170,7 @@ extension Store {
                     } else if let result = result {
                         let user = T(email: email, uid: result.user.uid, userData: userData)
                         Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
-                            self.getUser { user, error in
+                            self.getUser(dataWithType: type) { user, error in
                                 completion(user, error)
                             }
                         }
