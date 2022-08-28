@@ -13,10 +13,10 @@ import FirebaseAuth
 extension Store {
     public struct Auth {
         public typealias AuthRemoveCompletion = (Error?) -> Void
-        public typealias AuthSignInCompletion<T:AppUser> = (T?, Error?) -> Void
-        public typealias AuthSignUpCompletion<T:AppUser> = (T?, Error?) -> Void
+        public typealias AuthSignInCompletion = (Data?, Error?) -> Void
+        public typealias AuthSignUpCompletion = (Data?, Error?) -> Void
         public typealias AuthSignOutCompletion = (Error?) -> Void
-        public typealias AuthUserDataCompletion<T:AppUser> = (T?, Error?) -> Void
+        public typealias AuthUserDataCompletion = (Data?, Error?) -> Void
         
         private var auth: FirebaseAuth.Auth { FirebaseAuth.Auth.auth() }
         private var currentNonce: String?
@@ -55,7 +55,7 @@ extension Store {
         
         public func getUser<T:AppUser>(
             dataWithType type: T.Type,
-            completion:AuthUserDataCompletion<T>? = nil) {
+            completion:AuthUserDataCompletion? = nil) {
                 if let currentUser = currentUser {
                     Store.firestore.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
                         if let error = error {
@@ -107,7 +107,7 @@ extension Store {
             email: String,
             password: String,
             type: T.Type,
-            completion: @escaping AuthSignInCompletion<T>) {
+            completion: @escaping AuthSignInCompletion) {
                 auth.signIn(withEmail: email, password: password) { result, error in
                     if let error = error {
                         Store.firestore.registerError(message: error.localizedDescription)
@@ -124,7 +124,7 @@ extension Store {
             apple credential: ASAuthorizationAppleIDCredential,
             nonce: String?,
             type: T.Type,
-            completion: @escaping AuthSignInCompletion<T>) {
+            completion: @escaping AuthSignInCompletion) {
                 if let appleToken = credential.identityToken, let token = String(data: appleToken, encoding: .utf8) {
                     let cred = OAuthProvider.credential(withProviderID: "apple.com", idToken: token, rawNonce: nonce)
                     auth.signIn(with: cred) { (result, error) in
@@ -161,8 +161,7 @@ extension Store {
             password: String,
             userData: [String : Any],
             type: T.Type,
-            completion: @escaping AuthSignUpCompletion<T>) {
-                #warning("TODO: Should I handle usernames here or should the app handle it?")
+            completion: @escaping AuthSignUpCompletion) {
                 auth.createUser(withEmail: email, password: password) { result, error in
                     if let error = error {
                         Store.firestore.registerError(message: error.localizedDescription)

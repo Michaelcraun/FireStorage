@@ -37,6 +37,7 @@ extension Store {
     
     public struct Firestore {
         public typealias FirestoreErrorCompletion = (Error?) -> Void
+        public typealias FirestoreCompendiumCompletion = (Error?) -> Void
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         
@@ -104,26 +105,25 @@ extension Store.Firestore {
 }
 
 extension CollectionReference {
-    public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
-    public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
+    public typealias FirestoreGetCompletion = (Data?, Error?) -> Void
+    public typealias FirestoreGetArrayCompletion = ([Data]?, Error?) -> Void
     public typealias FirestorePutCompletion = (DocumentReference?, Error?) -> Void
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
-    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
+    public typealias FirestoreObserveCompletion = ([Data]?, [Data]?, [Data]?, Error?) -> Void
     
     public func get<T:Codable>(
         ofType type: T.Type,
-        completion: @escaping FirestoreGetArrayCompletion<T>) {
+        completion: @escaping FirestoreGetArrayCompletion) {
             self.getDocuments { snapshot, error in
                 if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
                 } else if let snapshot = snapshot {
                     var errors: [String] = []
-                    let objects: [T] = snapshot.documents.compactMap({
+                    let objects: [Data] = snapshot.documents.compactMap({
                         do {
                             let json = try JSONSerialization.data(withJSONObject: $0, options: .prettyPrinted)
-                            let value = try JSONDecoder().decode(type, from: json)
-                            return value
+                            return json
                         } catch {
                             errors.append(error.localizedDescription)
                             return nil
@@ -146,7 +146,7 @@ extension CollectionReference {
     public func get<T:Codable>(
         dataWithId id: String,
         ofType type: T.Type,
-        completion: @escaping FirestoreGetCompletion<T>) {
+        completion: @escaping FirestoreGetCompletion) {
         self.document(id).getDocument { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -154,8 +154,7 @@ extension CollectionReference {
             } else if let data = snapshot?.data() {
                 do {
                     let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                    let value = try JSONDecoder().decode(type, from: json)
-                    completion(value, nil)
+                    completion(json, nil)
                 } catch {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
@@ -202,27 +201,26 @@ extension CollectionReference {
     
     public func observeChildren<T:Codable>(
         dataOfType type: T.Type,
-        completion: @escaping FirestoreObserveCompletion<T>) {
+        completion: @escaping FirestoreObserveCompletion) {
         self.addSnapshotListener { snapshot, error in
             if let error = error {
                 Store.firestore.registerError(message: error.localizedDescription)
                 completion(nil, nil, nil, error)
             } else if let snapshot = snapshot {
-                var new: [T] = []
-                var updated: [T] = []
-                var removed: [T] = []
+                var new: [Data] = []
+                var updated: [Data] = []
+                var removed: [Data] = []
                 
                 for change in snapshot.documentChanges {
                     let data = change.document.data()
                     
                     do {
                         let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                        let object = try JSONDecoder().decode(type, from: json)
                         
                         switch change.type {
-                        case .added: new.append(object)
-                        case .modified: updated.append(object)
-                        case .removed: removed.append(object)
+                        case .added: new.append(json)
+                        case .modified: updated.append(json)
+                        case .removed: removed.append(json)
                         }
                     } catch {
                         Store.firestore.registerError(message: error.localizedDescription)
