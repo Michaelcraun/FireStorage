@@ -7,7 +7,6 @@
 
 import Foundation
 import FirebaseMessaging
-import UIKit
 
 extension Store {
     public struct Messaging {

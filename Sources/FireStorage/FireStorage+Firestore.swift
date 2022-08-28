@@ -105,9 +105,43 @@ extension Store.Firestore {
 
 extension CollectionReference {
     public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
+    public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
     public typealias FirestorePutCompletion = (DocumentReference?, Error?) -> Void
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
+    
+    public func get<T:Codable>(
+        ofType type: T.Type,
+        completion: @escaping FirestoreGetArrayCompletion<T>) {
+            self.getDocuments { snapshot, error in
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                    completion(nil, error)
+                } else if let snapshot = snapshot {
+                    var errors: [String] = []
+                    let objects: [T] = snapshot.documents.compactMap({
+                        do {
+                            let json = try JSONSerialization.data(withJSONObject: $0, options: .prettyPrinted)
+                            let value = try JSONDecoder().decode(type, from: json)
+                            return value
+                        } catch {
+                            errors.append(error.localizedDescription)
+                            return nil
+                        }
+                    })
+                    
+                    if !errors.isEmpty {
+                        let combined = errors.joined(separator: ",")
+                        let error = "Encountered errors while fetching documents from \(self.collectionID): \(combined)"
+                        Store.firestore.registerError(message: error)
+                        completion(objects, error)
+                    }
+                } else {
+                    Store.firestore.registerError(message: "No data available for \(self.collectionID)")
+                    completion(nil, "No data available for \(self.collectionID)")
+                }
+            }
+        }
     
     public func get<T:Codable>(
         dataWithId id: String,
