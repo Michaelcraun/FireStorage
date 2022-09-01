@@ -134,10 +134,19 @@ extension DatabaseReference {
 extension DatabaseQuery {
     public typealias DatabaseObserveCompletion = (DataSnapshot) -> Void
     
-    public func observe(
-        _ eventType: DataEventType,
-        completion: @escaping DatabaseObserveCompletion) {
-            self.removeAllObservers()
-            self.observe(eventType, with: completion)
-        }
+//    public func observe<T:Codable>(
+//        _ eventType: DataEventType,
+//        dataType: T.Type,
+//        completion: @escaping DatabaseObserveCompletion) {
+//            self.removeAllObservers()
+//            self.observe(eventType) { snapshot in
+//                var data: [T] = []
+//                var errors: [String] = []
+//
+//                snapshot.
+//                for child in snapshot.children {
+//
+//                }
+//            }
+//        }
 }

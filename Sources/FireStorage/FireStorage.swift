@@ -5,7 +5,7 @@ public struct Store {
     public static var auth = Store.Auth()
     public static let crashlytics = Store.Crashlytics()
     public static let database = Store.Database()
-    public static let firestore = Store.Firestore()
+    public static var firestore = Store.Firestore()
     public static let functions = Store.Functions()
     public static var messaging = Store.Messaging()
     public static let storage = Store.Storage()

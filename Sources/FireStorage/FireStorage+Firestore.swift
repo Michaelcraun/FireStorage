@@ -6,36 +6,21 @@
 //
 
 import FirebaseFirestore
+import FirebaseFirestoreSwift
 
 extension Store {
-    /* Firestore data structure
-     * + NPCGen5e
-     * +-> account
-     * +-> action
-     *     +-> source: String ("core", "community", or uid)
-     * +-> armor
-     *     +-> source: String ("core", "community", or uid)
-     * +-> detail
-     * +-> error
-     * +-> filter
-     * +-> error
-     * +-> levelData
-     * +-> occupation
-     *     +-> source: String ("core", "community", or uid)
-     * +-> public
-     * +-> products
-     * +-> purchase
-     * +-> race
-     *     +-> source: String ("core", "community", or uid)
-     * +-> subrace
-     *     +-> source: String ("core", "community", or uid)
-     * +-> trait
-     *     +-> source: String ("core", "community", or uid)
-     * +-> weapon
-     *     +-> source: String ("core", "community", or uid)
-     */
-    
     public struct Firestore {
+        // GOAL: I want this to be agnostic of what database it is hooked up to.
+        // Thus, I need some way to add to and/or initialize an array of
+        // CollectionReference to store and retrieve data from the Firestore database
+        //
+        // I also want the calls to this struct to be as simplistic and straight-
+        // forward as possible. Something like this:
+        //
+        // Store.firestore.set(structure: ...)
+        // Store.firestore.add(collection: "action")
+        // Store.firestore.action.get(...)
+        
         public typealias FirestoreErrorCompletion = (Error?) -> Void
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
@@ -121,8 +106,7 @@ extension CollectionReference {
                     var errors: [String] = []
                     let objects: [T] = snapshot.documents.compactMap({
                         do {
-                            let json = try JSONSerialization.data(withJSONObject: $0, options: .prettyPrinted)
-                            let value = try JSONDecoder().decode(type, from: json)
+                            let value = try $0.data(as: type)
                             return value
                         } catch {
                             errors.append(error.localizedDescription)
@@ -130,7 +114,9 @@ extension CollectionReference {
                         }
                     })
                     
-                    if !errors.isEmpty {
+                    if errors.isEmpty {
+                        completion(objects, nil)
+                    } else {
                         let combined = errors.joined(separator: ",")
                         let error = "Encountered errors while fetching documents from \(self.collectionID): \(combined)"
                         Store.firestore.registerError(message: error)
@@ -147,95 +133,97 @@ extension CollectionReference {
         dataWithId id: String,
         ofType type: T.Type,
         completion: @escaping FirestoreGetCompletion<T>) {
-        self.document(id).getDocument { snapshot, error in
-            if let error = error {
-                Store.firestore.registerError(message: error.localizedDescription)
-                completion(nil, error)
-            } else if let data = snapshot?.data() {
-                do {
-                    let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                    let value = try JSONDecoder().decode(type, from: json)
-                    completion(value, nil)
-                } catch {
+            self.document(id).getDocument { snapshot, error in
+                if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, error)
+                } else if let snapshot = snapshot {
+                    do {
+                        let value = try snapshot.data(as: type)
+                        completion(value, nil)
+                    } catch {
+                        Store.firestore.registerError(message: error.localizedDescription)
+                        completion(nil, error)
+                    }
+                } else {
+                    Store.firestore.registerError(message: "No data available [\(id)]")
+                    completion(nil, "No data available [\(id)]")
                 }
-            } else {
-                Store.firestore.registerError(message: "No data available [\(id)]")
-                completion(nil, "No data available [\(id)]")
             }
         }
-    }
     
     public func put<T:Codable>(
         data: T,
         forId id: String? = nil,
         completion: FirestorePutCompletion? = nil) {
-        let documentId = id ?? self.document().documentID
-        let document = self.document(documentId)
-        
-        do {
-            let encoded = try JSONEncoder().encode(data)
-            if let json = try JSONSerialization.jsonObject(with: encoded, options: .allowFragments) as? [String : Any] {
-                document.setData(json, merge: true) { error in
-                    if let error = error {
-                        Store.firestore.registerError(message: error.localizedDescription)
+            let documentId = id ?? self.document().documentID
+            let document = self.document(documentId)
+            
+            do {
+                let encoded = try JSONEncoder().encode(data)
+                if let json = try JSONSerialization.jsonObject(with: encoded, options: .fragmentsAllowed) as? [String : Any] {
+                    document.setData(json, merge: true) { error in
+                        if let error = error {
+                            Store.firestore.registerError(message: error.localizedDescription)
+                        }
+                        completion?(document, error)
                     }
-                    completion?(document, error)
+                } else {
+                    Store.firestore.registerError(message: "could not serialize object [\(data)]")
+                    completion?(nil, "could not serialize object")
                 }
+            } catch {
+                completion?(nil, error)
             }
-        } catch {
-            completion?(nil, error)
         }
-    }
     
     public func remove(
         id: String,
         completion: FirestoreRemoveCompletion? = nil) {
-        self.document(id).delete { error in
-            if let error = error {
-                Store.firestore.registerError(message: error.localizedDescription)
+            self.document(id).delete { error in
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                }
+                completion?(error)
             }
-            completion?(error)
         }
-    }
     
     public func observeChildren<T:Codable>(
         dataOfType type: T.Type,
         completion: @escaping FirestoreObserveCompletion<T>) {
-        self.addSnapshotListener { snapshot, error in
-            if let error = error {
-                Store.firestore.registerError(message: error.localizedDescription)
-                completion(nil, nil, nil, error)
-            } else if let snapshot = snapshot {
-                var new: [T] = []
-                var updated: [T] = []
-                var removed: [T] = []
-                
-                for change in snapshot.documentChanges {
-                    let data = change.document.data()
+            self.addSnapshotListener { snapshot, error in
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                    completion(nil, nil, nil, error)
+                } else if let snapshot = snapshot {
+                    var new: [T] = []
+                    var updated: [T] = []
+                    var removed: [T] = []
                     
-                    do {
-                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                        let object = try JSONDecoder().decode(type, from: json)
+                    for change in snapshot.documentChanges {
+                        let data = change.document.data()
                         
-                        switch change.type {
-                        case .added: new.append(object)
-                        case .modified: updated.append(object)
-                        case .removed: removed.append(object)
+                        do {
+                            let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+                            let object = try JSONDecoder().decode(type, from: json)
+                            
+                            switch change.type {
+                            case .added: new.append(object)
+                            case .modified: updated.append(object)
+                            case .removed: removed.append(object)
+                            }
+                        } catch {
+                            Store.firestore.registerError(message: error.localizedDescription)
                         }
-                    } catch {
-                        Store.firestore.registerError(message: error.localizedDescription)
                     }
+                    
+                    completion(new, updated, removed, nil)
+                } else {
+                    Store.firestore.registerError(message: "No data found [\(self.collectionID)]")
+                    completion(nil, nil, nil, "No data found [\(self.collectionID)]")
                 }
-                
-                completion(new, updated, removed, nil)
-            } else {
-                Store.firestore.registerError(message: "No data found [\(self.collectionID)]")
-                completion(nil, nil, nil, "No data found [\(self.collectionID)]")
             }
         }
-    }
 }
 
 extension Query {
@@ -244,37 +232,36 @@ extension Query {
     public func observe<T:Codable>(
         dataOfType type: T.Type,
         completion: @escaping FirestoreObserveCompletion<T>) {
-        self.addSnapshotListener { snapshot, error in
-            if let error = error {
-                Store.firestore.registerError(message: error.localizedDescription)
-                completion(nil, nil, nil, error)
-            } else if let snapshot = snapshot {
-                var new: [T] = []
-                var updated: [T] = []
-                var removed: [T] = []
-                
-                for change in snapshot.documentChanges {
-                    let data = change.document.data()
+            let listener = self.addSnapshotListener { snapshot, error in
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                    completion(nil, nil, nil, error)
+                } else if let snapshot = snapshot {
+                    var new: [T] = []
+                    var updated: [T] = []
+                    var removed: [T] = []
                     
-                    do {
-                        let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-                        let object = try JSONDecoder().decode(type, from: json)
+                    for change in snapshot.documentChanges {
+                        let document = change.document
                         
-                        switch change.type {
-                        case .added: new.append(object)
-                        case .modified: updated.append(object)
-                        case .removed: removed.append(object)
+                        do {
+                            let object = try document.data(as: type)
+                            
+                            switch change.type {
+                            case .added: new.append(object)
+                            case .modified: updated.append(object)
+                            case .removed: removed.append(object)
+                            }
+                        } catch {
+                            Store.firestore.registerError(message: error.localizedDescription)
                         }
-                    } catch {
-                        Store.firestore.registerError(message: error.localizedDescription)
                     }
+                    
+                    completion(new, updated, removed, nil)
+                } else {
+                    Store.firestore.registerError(message: "No data found [\(self.description)]")
+                    completion(nil, nil, nil, "No data found [\(self.description)]")
                 }
-                
-                completion(new, updated, removed, nil)
-            } else {
-                Store.firestore.registerError(message: "No data found [\(self.description)]")
-                completion(nil, nil, nil, "No data found [\(self.description)]")
             }
         }
-    }
 }
