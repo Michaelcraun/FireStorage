@@ -25,6 +25,8 @@ extension Store {
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         
+        private var delegate: FirestoreDelegate? 
+        
         // MARK: - Users
         public var accounts: CollectionReference { firestore.collection("account") }
         
@@ -75,6 +77,38 @@ extension Store {
                     }
                 }
             }
+        
+        public mutating func set(delegate: FirestoreDelegate) {
+            self.delegate = delegate
+            self.start()
+        }
+        
+        public func start() {
+            fetch(collection: actions)
+            fetch(collection: armors)
+            fetch(collection: occupations)
+            fetch(collection: races)
+            fetch(collection: subraces)
+            fetch(collection: traits)
+            fetch(collection: weapons)
+        }
+        
+        private func fetch(collection: CollectionReference) {
+            collection.getDocuments { snapshot, error in
+                if let error = error {
+                    registerStartup(error: error)
+                } else if let snapshot = snapshot {
+                    let data = snapshot.documents.map({ $0.data() })
+                    delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                }
+            }
+        }
+        
+        private func registerStartup(error: Error) {
+            Store.printDebug(error.localizedDescription)
+            Store.firestore.registerError(message: error.localizedDescription)
+            delegate?.firestoreDidEncounter(error: error)
+        }
     }
 }
 
@@ -152,6 +186,7 @@ extension CollectionReference {
             }
         }
     
+    #warning("Should this be updated to handle arrays?")
     public func put<T:Codable>(
         data: T,
         forId id: String? = nil,
