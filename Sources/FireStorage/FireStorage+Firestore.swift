@@ -20,6 +20,9 @@ extension Store {
         // Store.firestore.set(structure: ...)
         // Store.firestore.add(collection: "action")
         // Store.firestore.action.get(...)
+        //
+        // The above might be a pipe dream. Should contemplate this for a future release
+        // and come up with a better solution.
         
         public typealias FirestoreErrorCompletion = (Error?) -> Void
         

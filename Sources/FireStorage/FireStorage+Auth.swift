@@ -192,5 +192,9 @@ extension Store {
                 completion(error)
             }
         }
+        
+        public func errorCode(from error: Error) -> AuthErrorCode.Code? {
+            return AuthErrorCode.Code(rawValue: error._code)
+        }
     }
 }
