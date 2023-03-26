@@ -130,7 +130,7 @@ extension CollectionReference {
     public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
     public typealias FirestorePutCompletion = (DocumentReference?, Error?) -> Void
     public typealias FirestoreRemoveCompletion = (Error?) -> Void
-    public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
+    public typealias FirestoreObserveCompletion<T:Codable> = (_ new: [T]?, _ updated: [T]?, _ removed: [T]?, _ error: Error?) -> Void
     
     public func get<T:Codable>(
         ofType type: T.Type,
@@ -228,8 +228,9 @@ extension CollectionReference {
     
     public func observeChildren<T:Codable>(
         dataOfType type: T.Type,
+        query: Query? = nil,
         completion: @escaping FirestoreObserveCompletion<T>) {
-            self.addSnapshotListener { snapshot, error in
+            func handleListenerCallBack(snapshot: QuerySnapshot?, error: Error?) {
                 if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, nil, nil, error)
@@ -259,6 +260,16 @@ extension CollectionReference {
                 } else {
                     Store.firestore.registerError(message: "No data found [\(self.collectionID)]")
                     completion(nil, nil, nil, "No data found [\(self.collectionID)]")
+                }
+            }
+            
+            if let query = query {
+                query.addSnapshotListener { snapshot, error in
+                    handleListenerCallBack(snapshot: snapshot, error: error)
+                }
+            } else {
+                self.addSnapshotListener { snapshot, error in
+                    handleListenerCallBack(snapshot: snapshot, error: error)
                 }
             }
         }
