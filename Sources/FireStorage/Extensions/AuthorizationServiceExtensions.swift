@@ -12,8 +12,9 @@ extension ASAuthorizationAppleIDCredential {
         let characters = self.user.replacingOccurrences(of: ".", with: "")
         var result: String = ""
         for _ in 0..<10 {
-            let char = characters.randomElement()!
-            result.append(char)
+            if let char = characters.randomElement() {
+                result.append(char)
+            }
         }
         return "user\(result.uppercased())"
     }
