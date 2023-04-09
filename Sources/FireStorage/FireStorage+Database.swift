@@ -80,6 +80,40 @@ extension DatabaseReference {
         }
     }
     
+    public func getAll<T:Codable,Y:Equatable>(ofType type: T.Type, whereField field: String, isEqualTo value: Y, completion: @escaping DatabaseGetAllCompletion<T>) {
+        // Unfortunately, due to the way RTD works, we cannot limit a query to objects where a specific
+        // field is equal to a specific value, so we have to pull down all objects and sort through
+        // them afterward... :/
+        self.observeSingleEvent(of: .value) { snapshot in
+            var objects: [T] = []
+            
+            if let snapshots = snapshot.children.allObjects as? [DataSnapshot] {
+                for snapshot in snapshots {
+                    do {
+                        guard let dictionary = snapshot.value as? [String : Any] else {
+                            Store.printDebug("Unable to convert snapshot to dictionary [\(snapshot.ref.url)]")
+                            continue
+                        }
+                        
+                        if (dictionary[field] as? Y) == value {
+                            let json = try JSONSerialization.data(withJSONObject: snapshot.value as Any, options: .prettyPrinted)
+                            let object = try JSONDecoder().decode(T.self, from: json)
+                            objects.append(object)
+                        }
+                        
+                        if snapshot == snapshots.last {
+                            completion(objects, nil)
+                        }
+                    } catch {
+                        Store.printDebug("could not decode document [\(snapshot.ref.url)]")
+                    }
+                }
+            } else {
+                Store.printDebug("unable to find data [\(self.url)]")
+            }
+        }
+    }
+    
     public func get<T:Codable>(
         dataWithId id: String,
         ofType type: T.Type,
