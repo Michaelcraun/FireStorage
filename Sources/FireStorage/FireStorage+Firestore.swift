@@ -23,12 +23,17 @@ extension Store {
         //
         // The above might be a pipe dream. Should contemplate this for a future release
         // and come up with a better solution.
+        //
+        // Alright, so I've thought about this and we're going to take an arguably
+        // unconventional approach to this. At runtime, we're going to load the collection
+        // structure from a provided json file. This method will create a new Swift file and
+        // add it to the project structure.
         
         public typealias FirestoreErrorCompletion = (Error?) -> Void
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         
-        private var delegate: FirestoreDelegate? 
+        private var delegate: FirestoreDelegate?
         
         // MARK: - Users
         public var accounts: CollectionReference { firestore.collection("account") }
