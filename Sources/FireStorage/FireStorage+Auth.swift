@@ -21,7 +21,7 @@ extension Store {
         private var auth: FirebaseAuth.Auth { FirebaseAuth.Auth.auth() }
         public var currentUser: User? { auth.currentUser }
         
-        public func generateSha256Nonce() -> String? {
+        public func generateNonce() -> String? {
             var randomBytes = [UInt8](repeating: 0, count: 32)
             let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
             if errorCode != errSecSuccess {
@@ -35,6 +35,13 @@ extension Store {
                 // Pick a random character from the set, wrapping around if needed.
                 charset[Int(byte) % charset.count]
             })
+        }
+        
+        public func generateSha256(from input: String) -> String? {
+            let inputData = Data(input.utf8)
+            let hashedData = SHA256.hash(data: inputData)
+            let hashString = hashedData.compactMap { String(format: "%02x", $0) }.joined()
+            return hashString
         }
         
         public func getUser<T:AppUser>(
