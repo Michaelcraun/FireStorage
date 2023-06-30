@@ -8,7 +8,15 @@
 import AuthenticationServices
 
 extension ASAuthorizationAppleIDCredential {
-    var username: String {
+    func firstname() -> String {
+        return self.fullName?.givenName ?? "user"
+    }
+    
+    func lastname() -> String {
+        if let familyName = self.fullName?.familyName {
+            return familyName
+        }
+        
         let characters = self.user.replacingOccurrences(of: ".", with: "")
         var result: String = ""
         for _ in 0..<10 {
@@ -16,6 +24,10 @@ extension ASAuthorizationAppleIDCredential {
                 result.append(char)
             }
         }
-        return "user\(result.uppercased())"
+        return result
+    }
+    
+    func username() -> String {
+        return "\(firstname()).\(lastname())"
     }
 }
