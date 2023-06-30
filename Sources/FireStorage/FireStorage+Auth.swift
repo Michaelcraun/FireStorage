@@ -19,38 +19,22 @@ extension Store {
         public typealias AuthUserDataCompletion<T:AppUser> = (T?, Error?) -> Void
         
         private var auth: FirebaseAuth.Auth { FirebaseAuth.Auth.auth() }
-        private var currentNonce: String?
         public var currentUser: User? { auth.currentUser }
         
-        mutating public func generateSha256Nonce() -> String {
-            let charset: Array<Character> =
-            Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-            var result = ""
-            var remainingLength = 32
-            
-            while remainingLength > 0 {
-                let randoms: [UInt8] = (0 ..< 16).map { _ in
-                    var random: UInt8 = 0
-                    let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
-                    if errorCode != errSecSuccess {
-                        fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
-                    }
-                    return random
-                }
-                
-                randoms.forEach { random in
-                    if random < charset.count {
-                        result.append(charset[Int(random)])
-                        remainingLength -= 1
-                    }
-                }
+        public func generateSha256Nonce() -> String? {
+            var randomBytes = [UInt8](repeating: 0, count: 32)
+            let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+            if errorCode != errSecSuccess {
+                let message = "Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)"
+                Store.firestore.registerError(message: message)
+                return nil
             }
             
-            let inputData = Data(result.utf8)
-            let hashedData = SHA256.hash(data: inputData)
-            let hashString = hashedData.compactMap { String(format: "%02x", $0) }.joined()
-            currentNonce = hashString
-            return hashString
+            let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+            return String(randomBytes.map { byte in
+                // Pick a random character from the set, wrapping around if needed.
+                charset[Int(byte) % charset.count]
+            })
         }
         
         public func getUser<T:AppUser>(
