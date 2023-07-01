@@ -26,8 +26,4 @@ extension ASAuthorizationAppleIDCredential {
         }
         return result
     }
-    
-    func username() -> String {
-        return "\(firstname()).\(lastname())"
-    }
 }

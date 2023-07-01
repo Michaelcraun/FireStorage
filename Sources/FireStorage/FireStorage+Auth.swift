@@ -125,10 +125,12 @@ extension Store {
                         } else if let result = result {
                             let email = result.user.email
                             let uid = result.user.uid
+                            let first = credential.firstname()
+                            let last = credential.lastname()
                             let userData: [String : Any] = [
-                                "first": credential.firstname(),
-                                "last": credential.lastname(),
-                                "username": credential.username()
+                                "first": first,
+                                "last": last,
+                                "username": "\(first.lowercased()).\(last.lowercased())"
                             ]
                             let user = T(email: email, uid: uid, userData: userData)
                             Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
