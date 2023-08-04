@@ -11,6 +11,7 @@ public struct Store {
     public static let storage = Store.Storage()
     
     public static var maxDownloadMegabytes: Int = 5
+    public static var verboseLoggingEnabled: Bool = false
     
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {

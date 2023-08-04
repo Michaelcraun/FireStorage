@@ -101,7 +101,20 @@ extension Store {
                 if let error = error {
                     registerStartup(error: error)
                 } else if let snapshot = snapshot {
-                    let data = snapshot.documents.map({ $0.data() })
+                    let data = snapshot.documents.map({
+                        #if DEBUG
+                        if Store.verboseLoggingEnabled {
+                            if let jsonData = try? JSONSerialization.data(withJSONObject: $0.data()),
+                               let json = String(data: jsonData, encoding: .utf8) {
+                                Store.printDebug("Fetched object from \(collection.collectionID) collection: \(json)")
+                            } else {
+                                Store.printDebug("Could not serialize data from: \($0.data())")
+                            }
+                        }
+                        #endif
+                        return $0.data()
+                    }) 
+                    
                     delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
                 }
             }
