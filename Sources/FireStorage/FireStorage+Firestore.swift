@@ -3,25 +3,6 @@ import FirebaseFirestoreSwift
 
 extension Store {
     public struct Firestore {
-        // GOAL: I want this to be agnostic of what database it is hooked up to.
-        // Thus, I need some way to add to and/or initialize an array of
-        // CollectionReference to store and retrieve data from the Firestore database
-        //
-        // I also want the calls to this struct to be as simplistic and straight-
-        // forward as possible. Something like this:
-        //
-        // Store.firestore.set(structure: ...)
-        // Store.firestore.add(collection: "action")
-        // Store.firestore.action.get(...)
-        //
-        // The above might be a pipe dream. Should contemplate this for a future release
-        // and come up with a better solution.
-        //
-        // Alright, so I've thought about this and we're going to take an arguably
-        // unconventional approach to this. At runtime, we're going to load the collection
-        // structure from a provided json file. This method will create a new Swift file and
-        // add it to the project structure.
-        
         public typealias FirestoreErrorCompletion = (Error?) -> Void
         public typealias FirestoreFetchCompletion = (_ error: Error?, _ data: [[String : Any]]?, _ collection: CollectionReference) -> Void
         
@@ -260,7 +241,7 @@ extension Query {
     public func observe<T:Codable>(
         dataOfType type: T.Type,
         completion: @escaping FirestoreObserveCompletion<T>) {
-            let listener = self.addSnapshotListener { snapshot, error in
+            self.addSnapshotListener { snapshot, error in
                 if let error = error {
                     Store.firestore.registerError(message: error.localizedDescription)
                     completion(nil, nil, nil, error)
