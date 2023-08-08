@@ -41,7 +41,7 @@ extension Store {
             dataWithType type: T.Type,
             completion:AuthUserDataCompletion<T>? = nil) {
                 if let currentUser = currentUser {
-                    Store.firestore.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
+                    Store.firestore.structure.accounts.get(dataWithId: currentUser.uid, ofType: type) { data, error in
                         if let error = error {
                             Store.firestore.registerError(message: error.localizedDescription)
                             completion?(nil, error)
@@ -66,7 +66,7 @@ extension Store {
                             Store.firestore.registerError(message: error.localizedDescription)
                             completion(error)
                         } else {
-                            Store.firestore.accounts.remove(id: currentUser.uid) { error in
+                            Store.firestore.structure.accounts.remove(id: currentUser.uid) { error in
                                 if let error = error {
                                     Store.firestore.registerError(message: error.localizedDescription)
                                     completion(error)
@@ -124,7 +124,7 @@ extension Store {
                                 "username": credential.username
                             ]
                             let user = T(email: email, uid: uid, userData: userData)
-                            Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
+                            Store.firestore.structure.accounts.put(data: user, forId: result.user.uid) { reference, error in
                                 self.getUser(dataWithType: type) { user, error in
                                     completion(user, error)
                                 }
@@ -153,7 +153,7 @@ extension Store {
                         completion(nil, error)
                     } else if let result = result {
                         let user = T(email: email, uid: result.user.uid, userData: userData)
-                        Store.firestore.accounts.put(data: user, forId: result.user.uid) { reference, error in
+                        Store.firestore.structure.accounts.put(data: user, forId: result.user.uid) { reference, error in
                             self.getUser(dataWithType: type) { user, error in
                                 completion(user, error)
                             }

@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Michael Craun on 7/18/22.
-//
-
 import FirebaseFirestore
 import FirebaseFirestoreSwift
 
@@ -30,36 +23,21 @@ extension Store {
         // add it to the project structure.
         
         public typealias FirestoreErrorCompletion = (Error?) -> Void
+        public typealias FirestoreFetchCompletion = (_ error: Error?, _ data: [[String : Any]]?, _ collection: CollectionReference) -> Void
         
-        private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
-        
+        public let structure: FirestoreStructurable
         private var delegate: FirestoreDelegate?
         
-        // MARK: - Users
-        public var accounts: CollectionReference { firestore.collection("account") }
+        init() {
+            self.structure = EmptyFirestoreStructure()
+        }
         
-        // MARK: - Database
-        public var actions: CollectionReference { firestore.collection("action") }
-        public var armors: CollectionReference { firestore.collection("armor") }
-        public var details: CollectionReference { firestore.collection("detail") }
-        public var levelDatas: CollectionReference { firestore.collection("levelData") }
-        public var occupations: CollectionReference { firestore.collection("occupation") }
-        public var races: CollectionReference { firestore.collection("race") }
-        public var subraces: CollectionReference { firestore.collection("subrace") }
-        public var traits: CollectionReference { firestore.collection("trait") }
-        public var weapons: CollectionReference { firestore.collection("weapon") }
-        
-        // MARK: - Characters
-        public var characters: CollectionReference { firestore.collection("character") }
-        
-        // MARK: - Application
-        public var errors: CollectionReference { firestore.collection("error") }
-        public var products: CollectionReference { firestore.collection("product") }
-        public var `public`: CollectionReference { firestore.collection("public") }
-        public var purchases: CollectionReference { firestore.collection("purchase") }
+        init(structure: FirestoreStructurable) {
+            self.structure = structure
+        }
         
         public func endAllObservers() {
-            
+            // TODO: Implement?
         }
         
         public func registerError(
@@ -75,7 +53,7 @@ extension Store {
                     line: line,
                     date: Date().description)
                 
-                errors.put(data: error) { reference, error in
+                structure.errors.put(data: error) { reference, error in
                     if let error = error {
                         Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
                         completion?(error)
@@ -92,13 +70,9 @@ extension Store {
         }
         
         public func start() {
-            fetch(collection: actions)
-            fetch(collection: armors)
-            fetch(collection: occupations)
-            fetch(collection: races)
-            fetch(collection: subraces)
-            fetch(collection: traits)
-            fetch(collection: weapons)
+            for collection in structure.startupCollections {
+                fetch(collection: collection)
+            }
         }
         
         private func fetch(collection: CollectionReference) {

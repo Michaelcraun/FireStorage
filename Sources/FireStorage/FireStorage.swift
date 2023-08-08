@@ -51,15 +51,20 @@ public struct Store {
     }
     
     func loadGooglePlist(named name: String) -> FirebaseOptions? {
+        guard let plist = pathForFile(named: name, of: "plist") else { return nil }
+        return FirebaseOptions(contentsOfFile: plist)
+    }
+    
+    func pathForFile(named name: String, of type: String) -> String? {
         for bundle in Bundle.allBundles {
-            if let path = bundle.path(forResource: name, ofType: "plist") {
-                return FirebaseOptions(contentsOfFile: path)
+            if let path = bundle.path(forResource: name, ofType: type) {
+                return path
             }
         }
         
         for bundle in Bundle.allFrameworks {
-            if let path = bundle.path(forResource: name, ofType: "plist") {
-                return FirebaseOptions(contentsOfFile: path)
+            if let path = bundle.path(forResource: name, ofType: type) {
+                return path
             }
         }
         
