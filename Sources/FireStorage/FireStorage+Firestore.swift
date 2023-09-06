@@ -60,21 +60,26 @@ extension Store {
             function: String = #function,
             line: Int = #line,
             completion: FirestoreErrorCompletion? = nil) {
-                let error = FirestoreError(
-                    error: message,
-                    file: URL(fileURLWithPath: file).lastPathComponent,
-                    function: function,
-                    line: line,
-                    date: Date().description)
-                
-                errors.put(data: error) { reference, error in
-                    if let error = error {
-                        Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
-                        completion?(error)
-                    } else if let reference = reference {
-                        Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
-                        completion?(nil)
+                if Store.verboseLoggingEnabled {
+                    let error = FirestoreError(
+                        error: message,
+                        file: URL(fileURLWithPath: file).lastPathComponent,
+                        function: function,
+                        line: line,
+                        date: Date().description)
+                    
+                    errors.put(data: error) { reference, error in
+                        if let error = error {
+                            Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
+                            completion?(error)
+                        } else if let reference = reference {
+                            Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
+                            completion?(nil)
+                        }
                     }
+                } else {
+                    Store.reportVerboseLoggingDisabled()
+                    completion?(nil)
                 }
             }
         
