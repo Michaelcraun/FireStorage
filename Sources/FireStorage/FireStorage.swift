@@ -77,6 +77,10 @@ public struct Store {
             }
         }
         
+        if let path = Bundle.main.path(forResource: name, ofType: "plist") {
+            return FirebaseOptions(contentsOfFile: path)
+        }
+        
         return nil
     }
     

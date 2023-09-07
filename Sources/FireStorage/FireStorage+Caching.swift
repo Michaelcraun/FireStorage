@@ -2,18 +2,16 @@ import Foundation
 import Chronometer
 
 extension Store {
-    public typealias CachedData = (filename: String, data: [String: Any])
-    
     public struct Cache {
         private let defaults = UserDefaults(suiteName: "FireStorage")
-        private let lastStoreKey = "Last_Store"
+        private let lastUpdateKey = "Last_Update"
         
         private var files: FileManager { FileManager.default }
         private var documents: URL { files.urls(for: .documentDirectory, in: .userDomainMask)[0] }
         private var documentStorage: URL { return documents.appendingPathComponent("FireStorage") }
         
         public var shouldFetch: Bool {
-            guard let lastFetch = get(valueFor: lastStoreKey) as? String,
+            guard let lastFetch = get(valueFor: lastUpdateKey) as? String,
                   let lastFetchDate = lastFetch.date() else { return true }
             return lastFetchDate.timeIntervalSinceNow < 24*60*60
         }
@@ -28,37 +26,46 @@ extension Store {
         }
         
         // MARK: - File caching
-        public func cache(dictionary: [String : Any], filename: String) throws {
-            self.set(value: Date().description, for: lastStoreKey)
+        public func createDirectoryStructureIfNeeded() {
+            if !files.fileExists(atPath: documentStorage.absoluteString) {
+                try? files.createDirectory(at: documentStorage, withIntermediateDirectories: true)
+            }
+        }
+        
+        public func cache(data: [[String : Any]], filename: String) {
+            createDirectoryStructureIfNeeded()
             
             let filename = "\(filename).json"
             let path = documentStorage.appendingPathComponent(filename)
             
             do {
-                let json = try JSONSerialization.data(withJSONObject: dictionary, options: .prettyPrinted)
+                try removeFile(at: path)
+                let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
                 try json.write(to: path)
                 
                 Store.printDebug("JSON successfully cached to \(path.absoluteString)")
             } catch {
                 Store.firestore.registerError(message: error.localizedDescription)
-                throw error
             }
         }
         
-        public func fetch() throws -> [CachedData] {
-            var data: [CachedData] = []
+        public func fetch(jsonFromFileNamed filename: String) -> [[String : Any]]? {
+            let filename = "\(filename).json"
+            let path = documentStorage.appendingPathComponent(filename)
             
             do {
-                let storedFiles = try files.contentsOfDirectory(atPath: documentStorage.absoluteString)
-                for file in storedFiles {
-                    print(file)
-                }
+                let data = try Data(contentsOf: path)
+                return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
             } catch {
                 Store.firestore.registerError(message: error.localizedDescription)
-                throw error
             }
-            
-            return data
+            return nil
+        }
+        
+        private func removeFile(at path: URL) throws {
+            if files.fileExists(atPath: path.absoluteString) {
+                try files.removeItem(at: path)
+            }
         }
     }
 }
