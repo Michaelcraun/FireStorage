@@ -9,6 +9,9 @@ import FirebaseFirestore
 import FirebaseFirestoreSwift
 
 extension Store {
+    public typealias FirestoreBooleanCompletion = (Bool, Error?) -> Void
+    public typealias FirestoreErrorCompletion = (Error?) -> Void
+    
     public struct Firestore {
         // GOAL: I want this to be agnostic of what database it is hooked up to.
         // Thus, I need some way to add to and/or initialize an array of
@@ -21,10 +24,7 @@ extension Store {
         // Store.firestore.add(collection: "action")
         // Store.firestore.action.get(...)
         
-        public typealias FirestoreErrorCompletion = (Error?) -> Void
-        
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
-        
         private var delegate: FirestoreDelegate? 
         
         // MARK: - Users
@@ -49,6 +49,11 @@ extension Store {
         public var products: CollectionReference { firestore.collection("product") }
         public var `public`: CollectionReference { firestore.collection("public") }
         public var purchases: CollectionReference { firestore.collection("purchase") }
+        public var publicData: [String : Any] = [ : ]
+        
+        // MARK: - Data Caching Support
+        private var lastUpdateKey: String = "Last_Update"
+        private var lastCheckKey: String = "Last_Check"
         
         public func endAllObservers() {
             
@@ -60,6 +65,8 @@ extension Store {
             function: String = #function,
             line: Int = #line,
             completion: FirestoreErrorCompletion? = nil) {
+                Store.printDebug("\(message) This error will be registered to the database.")
+                
                 if Store.verboseLoggingEnabled {
                     let error = FirestoreError(
                         error: message,
@@ -89,34 +96,93 @@ extension Store {
         }
         
         public func start() {
-            fetch(collection: actions)
-            fetch(collection: armors)
-            fetch(collection: occupations)
-            fetch(collection: races)
-            fetch(collection: subraces)
-            fetch(collection: traits)
-            fetch(collection: weapons)
+            checkForDatabaseUpdates { error in
+                self.fetch(collection: self.actions)
+                self.fetch(collection: self.armors)
+                self.fetch(collection: self.occupations)
+                self.fetch(collection: self.races)
+                self.fetch(collection: self.subraces)
+                self.fetch(collection: self.traits)
+                self.fetch(collection: self.weapons)
+            }
+        }
+        
+        /// Conditionally fetches the date the database was last updated. Will not attempt to fetch if the last attempt to fetch
+        /// was within the last 24 hours.
+        private func checkForDatabaseUpdates(completion: @escaping FirestoreErrorCompletion) {
+            func getLastUpdateDate(completion: @escaping (Date?, Error?) -> Void) {
+                self.public.getDocuments { snapshot, error in
+                    if let error = error {
+                        Store.firestore.registerError(message: error.localizedDescription)
+                        return completion(nil, error)
+                    } else if let timestamp = snapshot?.documents.first?.data()["lastUpdate"] as? Timestamp {
+                        return completion(timestamp.dateValue(), nil)
+                    } else {
+                        return completion(Date(), nil)
+                    }
+                }
+            }
+            
+            if let lastCheckDate = (Store.cache.get(valueFor: lastCheckKey) as? String)?.date() {
+                if lastCheckDate.timeIntervalSince(Date()) > 24*60*60 {
+                    getLastUpdateDate { date, error in
+                        if let date = date, error == nil {
+                            Store.cache.set(value: date.description, for: lastCheckKey)
+                        }
+                        return completion(nil)
+                    }
+                } else {
+                    return completion("check completed within 24 hours")
+                }
+            } else {
+                return completion("first check")
+            }
+            
+            // 3. Gather the date the database was last updated
+            getLastUpdateDate { date, error in
+                if let date = date, error == nil {
+                    Store.cache.set(value: date.description, for: lastCheckKey)
+                }
+                return completion(nil)
+            }
         }
         
         private func fetch(collection: CollectionReference) {
-            collection.getDocuments { snapshot, error in
-                if let error = error {
-                    registerStartup(error: error)
-                } else if let snapshot = snapshot {
-                    let data = snapshot.documents.map({ $0.data() })
-                    delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+            func fetchDataFromDatabase() {
+                collection.getDocuments { snapshot, error in
+                    if let error = error {
+                        registerStartup(error: error)
+                    } else if let snapshot = snapshot {
+                        let data = snapshot.documents.map({ $0.data() })
+                        // Cache the fetched data
+                        #warning("TODO: Cache the fetched data")
+                        delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                    }
                 }
+            }
+            
+            do {
+                // Attempt to fetch the cached data first
+                guard let data = try Store.cache.fetch(jsonFromFileNamed: collection.collectionID) else {
+                    // If none exists, fetch data from the database
+                    return fetchDataFromDatabase()
+                }
+                delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                return
+            } catch {
+                Store.firestore.registerError(message: error.localizedDescription)
+                delegate?.firestoreDidFetch(data: [], from: collection.collectionID)
             }
         }
         
         private func registerStartup(error: Error) {
-            Store.printDebug(error.localizedDescription)
             Store.firestore.registerError(message: error.localizedDescription)
             delegate?.firestoreDidEncounter(error: error)
         }
     }
 }
 
+// MARK: - Error Structure
 extension Store.Firestore {
     private struct FirestoreError: Codable {
         var error: String
@@ -127,6 +193,7 @@ extension Store.Firestore {
     }
 }
 
+// MARK: - CollectionReference Helpers
 extension CollectionReference {
     public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
     public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
@@ -266,6 +333,7 @@ extension CollectionReference {
         }
 }
 
+// MARK: - Query Helpers
 extension Query {
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
