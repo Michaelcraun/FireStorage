@@ -8,6 +8,20 @@ final class FireStorageTests: XCTestCase {
         completion(nil)
     }
     
+    func testShouldFetch() {
+        // By default (first install)...
+        Store.cache.setLatestUpdate(date: nil)
+        XCTAssertEqual(Store.cache.shouldFetch, true)
+        
+        // If the last update doesn't match what we have stored...
+        Store.cache.setLatestUpdate(date: "1/1/2023".date()!)
+        XCTAssertEqual(Store.cache.shouldFetch, true)
+        
+        // If the last update matches what we have stored...
+        Store.cache.setLatestUpdate(date: "1/1/2023".date()!)
+        XCTAssertEqual(Store.cache.shouldFetch, false)
+    }
+    
     func testStoreJson() throws {
         let dictionary: [[String : Any]] = [
             [

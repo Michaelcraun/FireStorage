@@ -127,7 +127,7 @@ extension Store {
                 if lastCheckDate.timeIntervalSince(Date()) > 24*60*60 {
                     getLastUpdateDate { date, error in
                         if let date = date, error == nil {
-                            Store.cache.set(value: date.description, for: lastCheckKey)
+                            Store.cache.setLatestUpdate(date: date)
                         }
                         return completion(nil)
                     }
@@ -141,38 +141,39 @@ extension Store {
             // 3. Gather the date the database was last updated
             getLastUpdateDate { date, error in
                 if let date = date, error == nil {
-                    Store.cache.set(value: date.description, for: lastCheckKey)
+                    Store.cache.setLatestUpdate(date: date)
                 }
                 return completion(nil)
             }
         }
         
         private func fetch(collection: CollectionReference) {
-            func fetchDataFromDatabase() {
+            func fetchAndCache() {
                 collection.getDocuments { snapshot, error in
                     if let error = error {
                         registerStartup(error: error)
                     } else if let snapshot = snapshot {
                         let data = snapshot.documents.map({ $0.data() })
-                        // Cache the fetched data
-                        #warning("TODO: Cache the fetched data")
+                        Store.cache.cache(data: data, filename: collection.collectionID)
                         delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
                     }
                 }
             }
             
-            do {
-                // Attempt to fetch the cached data first
-                guard let data = try Store.cache.fetch(jsonFromFileNamed: collection.collectionID) else {
-                    // If none exists, fetch data from the database
-                    return fetchDataFromDatabase()
-                }
+            // If caching is telling us we should fetch...
+            if Store.cache.shouldFetch {
+                fetchAndCache()
+                return
+            }
+            
+            // Otherwise, attempt to fetch the cached data first
+            if let data = Store.cache.fetch(jsonFromFileNamed: collection.collectionID) {
                 delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
                 return
-            } catch {
-                Store.firestore.registerError(message: error.localizedDescription)
-                delegate?.firestoreDidFetch(data: [], from: collection.collectionID)
             }
+            
+            // If that fails, default to fetching data from the database
+            fetchAndCache()
         }
         
         private func registerStartup(error: Error) {

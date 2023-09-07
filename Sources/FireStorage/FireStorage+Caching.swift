@@ -2,27 +2,43 @@ import Foundation
 import Chronometer
 
 extension Store {
-    public struct Cache {
+    public class Cache {
         private let defaults = UserDefaults(suiteName: "FireStorage")
-        private let lastUpdateKey = "Last_Update"
         
         private var files: FileManager { FileManager.default }
         private var documents: URL { files.urls(for: .documentDirectory, in: .userDomainMask)[0] }
         private var documentStorage: URL { return documents.appendingPathComponent("FireStorage") }
         
-        public var shouldFetch: Bool {
-            guard let lastFetch = get(valueFor: lastUpdateKey) as? String,
-                  let lastFetchDate = lastFetch.date() else { return true }
-            return lastFetchDate.timeIntervalSinceNow < 24*60*60
-        }
+        public var shouldFetch: Bool = false
         
         // MARK: - UserDefaults support
         public func get(valueFor key: String) -> Any? {
             return defaults?.value(forKey: "FireStorage_\(key)")
         }
         
-        public func set(value: Any, for key: String) {
+        public func set(value: Any?, for key: String) {
             defaults?.set(value, forKey: "FireStorage_\(key)")
+        }
+        
+        public func setLatestUpdate(date: Date?) {
+            let key = "Last_Update_Date"
+            let tempUpdate = get(valueFor: key) as? String
+            
+            guard let date = date else {
+                set(value: nil, for: key)
+                shouldFetch = true
+                return
+            }
+            
+            if let tempUpdateDate = tempUpdate?.date() {
+                if tempUpdateDate == date {
+                    shouldFetch = false
+                    return
+                }
+            }
+            
+            set(value: date.description, for: key)
+            shouldFetch = true
         }
         
         // MARK: - File caching
