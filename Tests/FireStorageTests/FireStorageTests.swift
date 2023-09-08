@@ -4,13 +4,17 @@ import XCTest
 
 final class FireStorageTests: XCTestCase {
     override func setUp(completion: @escaping (Error?) -> Void) {
+        // Disable verbose logging so we don't need database integration
         Store.verboseLoggingEnabled = false
         completion(nil)
     }
     
     func testShouldFetch() {
-        // By default (first install)...
+        // Reset latest update date to allow these tests to pass
         Store.cache.setLatestUpdate(date: nil)
+        
+        // By default (first install)...
+        Store.cache.setLatestUpdate(date: "1/1/2022".date()!)
         XCTAssertEqual(Store.cache.shouldFetch, true)
         
         // If the last update doesn't match what we have stored...

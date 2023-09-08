@@ -21,10 +21,10 @@
     {
       "identity" : "chronometer",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Michaelcraun/Chronometer.git",
+      "location" : "https://github.com/KittyMac/Chronometer.git",
       "state" : {
         "branch" : "main",
-        "revision" : "5b1ffb7861b952aef3b0e19de767d7a2f60dd9e7"
+        "revision" : "759056fbf26e198cff3891800d9760bcba273b33"
       }
     },
     {

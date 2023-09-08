@@ -42,7 +42,7 @@ extension Store {
         }
         
         // MARK: - File caching
-        public func createDirectoryStructureIfNeeded() {
+        private func createDirectoryStructureIfNeeded() {
             if !files.fileExists(atPath: documentStorage.absoluteString) {
                 try? files.createDirectory(at: documentStorage, withIntermediateDirectories: true)
             }
