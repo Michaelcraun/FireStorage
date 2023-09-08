@@ -2,12 +2,17 @@ import FirebaseFirestore
 import FirebaseFirestoreSwift
 
 extension Store {
+    public typealias FirestoreBooleanCompletion = (Bool, Error?) -> Void
+    public typealias FirestoreErrorCompletion = (Error?) -> Void
+    
     public struct Firestore {
         public typealias FirestoreErrorCompletion = (Error?) -> Void
         public typealias FirestoreFetchCompletion = (_ error: Error?, _ data: [[String : Any]]?, _ collection: CollectionReference) -> Void
         
         public let structure: FirestoreStructurable
         private var delegate: FirestoreDelegate?
+        
+        private var lastCheckKey: String = "Last_Check"
         
         init() {
             self.structure = EmptyFirestoreStructure()
@@ -27,24 +32,25 @@ extension Store {
             function: String = #function,
             line: Int = #line,
             completion: FirestoreErrorCompletion? = nil) {
-                let error = FirestoreError(
-                    error: message,
-                    file: URL(fileURLWithPath: file).lastPathComponent,
-                    function: function,
-                    line: line,
-                    date: Date().description)
-                
-                structure.errors.put(data: error) { reference, error in
-                    if let error = error {
-                        Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
-                        completion?(error)
-                    } else if let reference = reference {
-                        Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
-                        completion?(nil)
+                if Store.verboseLoggingEnabled {
+                    Store.printDebug("\(message) This error will be registered to the database.")
+                    
+                    let error = FirestoreError(error: message, file: file, function: function, line: line)
+                    structure.errors.put(data: error) { reference, error in
+                        if let error = error {
+                            Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
+                            completion?(error)
+                        } else if let reference = reference {
+                            Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
+                            completion?(nil)
+                        }
                     }
+                } else {
+                    Store.reportVerboseLoggingDisabled()
+                    completion?(nil)
                 }
             }
-        
+                
         public mutating func set(delegate: FirestoreDelegate) {
             self.delegate = delegate
             self.start()
@@ -56,35 +62,107 @@ extension Store {
             }
         }
         
-        private func fetch(collection: CollectionReference) {
-            collection.getDocuments { snapshot, error in
-                if let error = error {
-                    registerStartup(error: error)
-                } else if let snapshot = snapshot {
-                    let data = snapshot.documents.map({ $0.data() })
-                    delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+        /// Conditionally fetches the date the database was last updated. Will not attempt to fetch if the last attempt to fetch
+        /// was within the last 24 hours.
+        private func checkForDatabaseUpdates(completion: @escaping FirestoreErrorCompletion) {
+            func getLastUpdateDate(completion: @escaping (Date?, Error?) -> Void) {
+                structure.public.getDocuments { snapshot, error in
+                    if let error = error {
+                        Store.firestore.registerError(message: error.localizedDescription)
+                        return completion(nil, error)
+                    } else if let timestamp = snapshot?.documents.first?.data()["lastUpdate"] as? Timestamp {
+                        return completion(timestamp.dateValue(), nil)
+                    } else {
+                        return completion(Date(), nil)
+                    }
                 }
+            }
+            
+            if let lastCheckDate = (Store.cache.get(valueFor: lastCheckKey) as? String)?.date() {
+                if lastCheckDate.timeIntervalSince(Date()) > 24*60*60 {
+                    getLastUpdateDate { date, error in
+                        if let date = date, error == nil {
+                            Store.cache.setLatestUpdate(date: date)
+                        }
+                        return completion(nil)
+                    }
+                } else {
+                    return completion("check completed within 24 hours")
+                }
+            } else {
+                return completion("first check")
+            }
+            
+            // 3. Gather the date the database was last updated
+            getLastUpdateDate { date, error in
+                if let date = date, error == nil {
+                    Store.cache.setLatestUpdate(date: date)
+                }
+                return completion(nil)
             }
         }
         
+        private func fetch(collection: CollectionReference) {
+            func fetchAndCache() {
+                collection.getDocuments { snapshot, error in
+                    if let error = error {
+                        registerStartup(error: error)
+                    } else if let snapshot = snapshot {
+                        let data = snapshot.documents.map({
+                            #if DEBUG
+                            if Store.verboseLoggingEnabled {
+                                if let jsonData = try? JSONSerialization.data(withJSONObject: $0.data()),
+                                   let json = String(data: jsonData, encoding: .utf8) {
+                                    Store.printDebug("Fetched object from \(collection.collectionID) collection: \(json)")
+                                } else {
+                                    Store.printDebug("Could not serialize data from: \($0.data())")
+                                }
+                            }
+                            #endif
+                            
+                            return $0.data()
+                        })
+                        Store.cache.cache(data: data, filename: collection.collectionID)
+                        delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                    }
+                }
+            }
+            
+            // If caching is telling us we should fetch...
+            if Store.cache.shouldFetch {
+                fetchAndCache()
+                return
+            }
+            
+            // Otherwise, attempt to fetch the cached data first
+            if let data = Store.cache.fetch(jsonFromFileNamed: collection.collectionID) {
+                delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                return
+            }
+            
+            // If that fails, default to fetching data from the database
+            fetchAndCache()
+        }
+        
         private func registerStartup(error: Error) {
-            Store.printDebug(error.localizedDescription)
             Store.firestore.registerError(message: error.localizedDescription)
             delegate?.firestoreDidEncounter(error: error)
         }
     }
 }
 
+// MARK: - Error Structure
 extension Store.Firestore {
     private struct FirestoreError: Codable {
         var error: String
         var file: String
         var function: String
         var line: Int
-        var date: String
+        var date: String = Date().description
     }
 }
 
+// MARK: - CollectionReference Helpers
 extension CollectionReference {
     public typealias FirestoreGetCompletion<T:Codable> = (T?, Error?) -> Void
     public typealias FirestoreGetArrayCompletion<T:Codable> = ([T]?, Error?) -> Void
@@ -235,6 +313,7 @@ extension CollectionReference {
         }
 }
 
+// MARK: - Query Helpers
 extension Query {
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
