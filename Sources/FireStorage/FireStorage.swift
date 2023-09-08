@@ -10,8 +10,14 @@ public struct Store {
     public static var messaging = Store.Messaging()
     public static let storage = Store.Storage()
     
+    public static let cache = Store.Cache()
+    
     public static var maxDownloadMegabytes: Int = 5
-    public static var verboseLoggingEnabled: Bool = false
+    
+    /// A boolean toggle determining if verbose logging is enabled (enabled by default). If enabled, error messages
+    /// and other info will be logged to the database for future reference.
+    public static var verboseLoggingEnabled: Bool = true
+    private static let verboseLoggingKey: String = "Verbose_Logging_Disabled_Reported"
     
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {
@@ -38,9 +44,10 @@ public struct Store {
                 startInProductionByDefault()
             }
         }
+        Store.cache.set(value: 0, for: Store.verboseLoggingKey)
     }
     
-    static func printDebug(_ message: String) {
+    public static func printDebug(_ message: String) {
         #if DEBUG
         print("FireStorage:", message)
         #endif
@@ -49,6 +56,13 @@ public struct Store {
     public static func endAllObservers() {
         database.endAllObservers()
         firestore.endAllObservers()
+    }
+    
+    public static func reportVerboseLoggingDisabled() {
+        guard Store.cache.get(valueFor: verboseLoggingKey) as? Int == 0 else { return }
+        Store.printDebug("WARNING: Verbose logging is disabled.")
+        Store.printDebug("Errors encountered will not be logged to the database.")
+        Store.cache.set(value: 1, for: verboseLoggingKey)
     }
     
     func loadGooglePlist(named name: String) -> FirebaseOptions? {
@@ -62,6 +76,10 @@ public struct Store {
             if let path = bundle.path(forResource: name, ofType: "plist") {
                 return FirebaseOptions(contentsOfFile: path)
             }
+        }
+        
+        if let path = Bundle.main.path(forResource: name, ofType: "plist") {
+            return FirebaseOptions(contentsOfFile: path)
         }
         
         return nil

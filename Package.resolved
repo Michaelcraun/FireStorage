@@ -19,6 +19,15 @@
       }
     },
     {
+      "identity" : "chronometer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/KittyMac/Chronometer.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "759056fbf26e198cff3891800d9760bcba273b33"
+      }
+    },
+    {
       "identity" : "firebase-ios-sdk",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/firebase-ios-sdk.git",
