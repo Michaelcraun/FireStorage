@@ -23,7 +23,9 @@ public var environment: Environment {
     guard let path = Bundle.main.appStoreReceiptURL?.path else { return .production }
     if path.contains("CoreSimulator") {
         return .development
-    } else if path.contains("sandboxReceipt") {
+    } else if path.contains("sandboxReceipt") ||
+      ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+      NSClassFromString("XCTest") != nil {
         return .testing
     } else {
         return .production

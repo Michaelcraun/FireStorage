@@ -31,18 +31,16 @@ class NPCGen5eStructure: FirestoreStructurable {
 }
 
 final class FireStorageTests: XCTestCase {
+    
     let structure = NPCGen5eStructure()
+    
     override func setUp(completion: @escaping (Error?) -> Void) {
         // Disable verbose logging so we don't need database integration
+        Store.init(plist: "FireStorage-PROD", devPlist: "FireStorage-DEV")
         Store.verboseLoggingEnabled = false
         completion(nil)
     }
     
-    func testGetCharacters() {
-        structure.characters.get(ofType: String.self) { texts, error in
-            
-        }
-    }
     func testShouldFetch() {
         // Reset latest update date to allow these tests to pass
         Store.cache.setLatestUpdate(date: nil)

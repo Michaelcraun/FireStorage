@@ -57,8 +57,10 @@ extension Store {
         }
         
         public func start() {
-            for collection in structure.startupCollections {
-                fetch(collection: collection)
+            self.checkForDatabaseUpdates { error in
+                for collection in self.structure.startupCollections {
+                    self.fetch(collection: collection)
+                }
             }
         }
         
