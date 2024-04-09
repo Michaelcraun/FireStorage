@@ -5,6 +5,7 @@
 //  Created by Michael Craun on 7/18/22.
 //
 
+import Foundation
 import FirebaseFirestore
 import FirebaseFirestoreSwift
 
@@ -26,6 +27,8 @@ extension Store {
         //
         // The above might be a pipe dream. Should contemplate this for a future release
         // and come up with a better solution.
+        
+        private var lock = NSLock()
         
         private var firestore: FirebaseFirestore.Firestore { FirebaseFirestore.Firestore.firestore() }
         private var delegate: FirestoreDelegate? 
@@ -152,6 +155,7 @@ extension Store {
         
         private func fetch(collection: CollectionReference) {
             func fetchAndCache() {
+                DispatchQueue.main.sync { self.lock.lock() }
                 collection.getDocuments { snapshot, error in
                     if let error = error {
                         registerStartup(error: error)
@@ -172,6 +176,7 @@ extension Store {
                         })
                         Store.cache.cache(data: data, filename: collection.collectionID)
                         delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                        DispatchQueue.main.sync { self.lock.lock() }
                     }
                 }
             }
