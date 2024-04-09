@@ -175,7 +175,6 @@ extension Store {
                         })
                         Store.cache.cache(data: data, filename: collection.collectionID)
                         self.delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
-                        DispatchQueue.main.sync { self.lock.lock() }
                     }
                 }
             }
