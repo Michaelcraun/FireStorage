@@ -155,7 +155,6 @@ extension Store {
         
         private func fetch(collection: CollectionReference) {
             func fetchAndCache() {
-                DispatchQueue.main.sync { self.lock.lock() }
                 collection.getDocuments { snapshot, error in
                     if let error = error {
                         self.registerStartup(error: error)
