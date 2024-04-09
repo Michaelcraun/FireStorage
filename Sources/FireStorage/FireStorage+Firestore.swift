@@ -13,7 +13,7 @@ extension Store {
     public typealias FirestoreBooleanCompletion = (Bool, Error?) -> Void
     public typealias FirestoreErrorCompletion = (Error?) -> Void
     
-    public struct Firestore {
+    public class Firestore {
         // GOAL: I want this to be agnostic of what database it is hooked up to.
         // Thus, I need some way to add to and/or initialize an array of
         // CollectionReference to store and retrieve data from the Firestore database
@@ -96,7 +96,7 @@ extension Store {
                 }
             }
         
-        public mutating func set(delegate: FirestoreDelegate) {
+        public func set(delegate: FirestoreDelegate) {
             self.delegate = delegate
             self.start()
         }
@@ -158,7 +158,7 @@ extension Store {
                 DispatchQueue.main.sync { self.lock.lock() }
                 collection.getDocuments { snapshot, error in
                     if let error = error {
-                        registerStartup(error: error)
+                        self.registerStartup(error: error)
                     } else if let snapshot = snapshot {
                         let data = snapshot.documents.map({
                             #if DEBUG
@@ -175,7 +175,7 @@ extension Store {
                             return $0.data()
                         })
                         Store.cache.cache(data: data, filename: collection.collectionID)
-                        delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                        self.delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
                         DispatchQueue.main.sync { self.lock.lock() }
                     }
                 }
