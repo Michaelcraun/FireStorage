@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/KittyMac/Chronometer.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "b4808d59a175b1f764cc3d7e2e927e5476b10427"
+        "revision" : "b4808d59a175b1f764cc3d7e2e927e5476b10427",
+        "version" : "0.1.11"
       }
     },
     {
