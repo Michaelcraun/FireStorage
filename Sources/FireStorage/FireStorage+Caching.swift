@@ -69,11 +69,13 @@ extension Store {
             let filename = "\(filename).json"
             let path = documentStorage.appendingPathComponent(filename)
             
-            do {
-                let data = try Data(contentsOf: path)
-                return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
-            } catch {
-                Store.firestore.registerError(message: error.localizedDescription)
+            if FileManager.default.fileExists(atPath: path.absoluteString) {
+                do {
+                    let data = try Data(contentsOf: path)
+                    return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
+                } catch {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                }   
             }
             return nil
         }
