@@ -12,12 +12,28 @@ public struct Store {
     
     public static let cache = Store.Cache()
     
+    public static var environmentOverride: Environment?
+    
+    /// The maximum number of megabytes of data allowed for any one download from Firebase storage.
     public static var maxDownloadMegabytes: Int = 5
     
-    /// A boolean toggle determining if verbose logging is enabled (enabled by default). If enabled, error messages
-    /// and other info will be logged to the database for future reference.
+    /// A boolean toggle determining if verbose logging is enabled (enabled by default). The two states of this Boolean
+    /// affect what messages are printed to the console.
+    ///
+    /// If enabled, all calls to `Store.firestore.registerError` will be logged to the console as well as
+    /// logged to the Firestore instance under the `error` collection.
+    ///
+    /// - warning: Regardless of status, errors will always be logged to the Firestore instance!
     public static var verboseLoggingEnabled: Bool = true
     private static let verboseLoggingKey: String = "Verbose_Logging_Disabled_Reported"
+    
+    // MARK: File Caching
+    /// A boolean toggle determining if file caching is enabled (enabled by default). If enabled, FireStorage will cache data
+    /// downloaded from the database locally and will not fetch new data except for when a number of seconds has passed
+    /// which is controlled via the `maximumCacheAge` value.
+    public static var cachingEnabled: Bool = true
+    /// The number of seconds that must pass before FireStorage will fetch data from Firestore. Defaults to 30 days.
+    public static var maximumCacheAge: TimeInterval = 2592000.0
     
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {
@@ -49,7 +65,11 @@ public struct Store {
     
     public static func printDebug(_ message: String) {
         #if DEBUG
-        print("FireStorage:", message)
+        if Store.verboseLoggingEnabled {
+            print("FireStorage:", message)
+        } else {
+            reportVerboseLoggingDisabled()
+        }
         #endif
     }
     

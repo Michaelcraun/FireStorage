@@ -54,10 +54,6 @@ extension Store {
         public var purchases: CollectionReference { firestore.collection("purchase") }
         public var publicData: [String : Any] = [ : ]
         
-        // MARK: - Data Caching Support
-        private var lastUpdateKey: String = "Last_Update"
-        private var lastCheckKey: String = "Last_Check"
-        
         public func endAllObservers() {
             
         }
@@ -68,28 +64,21 @@ extension Store {
             function: String = #function,
             line: Int = #line,
             completion: FirestoreErrorCompletion? = nil) {
-                Store.printDebug("\(message) This error will be registered to the database.")
+                let error = FirestoreError(
+                    error: message,
+                    file: URL(fileURLWithPath: file).lastPathComponent,
+                    function: function,
+                    line: line,
+                    date: Date().description)
                 
-                if Store.verboseLoggingEnabled {
-                    let error = FirestoreError(
-                        error: message,
-                        file: URL(fileURLWithPath: file).lastPathComponent,
-                        function: function,
-                        line: line,
-                        date: Date().description)
-                    
-                    errors.put(data: error) { reference, error in
-                        if let error = error {
-                            Store.printDebug("[ERROR] Unable to log error to database: \(error.localizedDescription)")
-                            completion?(error)
-                        } else if let reference = reference {
-                            Store.printDebug("[ERROR] \(message) logged to database [\(reference.documentID)]")
-                            completion?(nil)
-                        }
+                errors.put(data: error) { reference, error in
+                    if let error = error {
+                        Store.printDebug("[ERROR] Unable to log \(message) to database: \(error.localizedDescription)")
+                        completion?(error)
+                    } else if let reference = reference {
+                        Store.printDebug("\(message) logged to database [\(reference.documentID)]")
+                        completion?(nil)
                     }
-                } else {
-                    Store.reportVerboseLoggingDisabled()
-                    completion?(nil)
                 }
             }
         
@@ -99,97 +88,104 @@ extension Store {
         }
         
         public func start() {
-            checkForDatabaseUpdates { error in
-                self.fetch(collection: self.actions)
-                self.fetch(collection: self.armors)
-                self.fetch(collection: self.occupations)
-                self.fetch(collection: self.races)
-                self.fetch(collection: self.subraces)
-                self.fetch(collection: self.traits)
-                self.fetch(collection: self.weapons)
-            }
+            self.fetch(collection: self.actions)
+            self.fetch(collection: self.armors)
+            self.fetch(collection: self.occupations)
+            self.fetch(collection: self.races)
+            self.fetch(collection: self.subraces)
+            self.fetch(collection: self.traits)
+            self.fetch(collection: self.weapons)
         }
         
-        /// Conditionally fetches the date the database was last updated. Will not attempt to fetch if the last attempt to fetch
-        /// was within the last 24 hours.
-        private func checkForDatabaseUpdates(completion: @escaping FirestoreErrorCompletion) {
-            func getLastUpdateDate(completion: @escaping (Date?, Error?) -> Void) {
-                self.public.getDocuments { snapshot, error in
-                    if let error = error {
-                        Store.firestore.registerError(message: error.localizedDescription)
-                        return completion(nil, error)
-                    } else if let timestamp = snapshot?.documents.first?.data()["lastUpdate"] as? Timestamp {
-                        return completion(timestamp.dateValue(), nil)
-                    } else {
-                        return completion(Date(), nil)
-                    }
-                }
-            }
-            
-            if let lastCheckDate = (Store.cache.get(valueFor: lastCheckKey) as? String)?.date() {
-                if lastCheckDate.timeIntervalSince(Date()) > 24*60*60 {
-                    getLastUpdateDate { date, error in
-                        if let date = date, error == nil {
-                            Store.cache.setLatestUpdate(date: date)
-                        }
-                        return completion(nil)
-                    }
-                } else {
-                    return completion("check completed within 24 hours")
-                }
-            } else {
-                return completion("first check")
-            }
-            
-            // 3. Gather the date the database was last updated
-            getLastUpdateDate { date, error in
-                if let date = date, error == nil {
-                    Store.cache.setLatestUpdate(date: date)
-                }
-                return completion(nil)
-            }
-        }
-        
+        // If either of the following conditions are true, then data should be fetced from the
+        // database and cached locally:
+        // 1. The database tells us we should -> The database has a public.database document stored
+        //    which contains a list of updates. When the database is updated, this array should also be
+        //    updated to contain a new update Timestamp.
+        // 2. A specific amount of time has passed -> This is dictated by Store.maximumCacheAge and
+        //    automatically handled by the Cache logic itself.
         private func fetch(collection: CollectionReference) {
-            func fetchAndCache() {
-                collection.getDocuments { snapshot, error in
-                    if let error = error {
-                        registerStartup(error: error)
-                    } else if let snapshot = snapshot {
-                        let data = snapshot.documents.map({
-                            #if DEBUG
-                            if Store.verboseLoggingEnabled {
-                                if let jsonData = try? JSONSerialization.data(withJSONObject: $0.data()),
-                                   let json = String(data: jsonData, encoding: .utf8) {
-                                    Store.printDebug("Fetched object from \(collection.collectionID) collection: \(json)")
-                                } else {
-                                    Store.printDebug("Could not serialize data from: \($0.data())")
-                                }
+            // Query the database to check for a database update
+            checkForDatabaseUpdates { error in
+                // If an error is returned, we need to fetch from the database; otherwise, continue.
+                if let error = error {
+                    self.fetchAndCache(collection: collection, reason: error.localizedDescription)
+                    return
+                }
+                
+                // Caching automatically handles when we need to not use cached data, so use
+                // the data that comes back from fetching from the cache, if we have it...
+                if let cached = Store.cache.fetch(jsonFromFileNamed: collection.collectionID) {
+                    self.delegate?.firestoreDidFetch(data: cached, from: collection.collectionID)
+                    return
+                }
+                
+                // Otherwise, fetch data from the database and cache it.
+                self.fetchAndCache(collection: collection, reason: "cache expired or empty")
+            }
+        }
+        
+        // Returning an error via the completion of this function indicates that data should be fetched
+        // from the database.
+        private func checkForDatabaseUpdates(completion: @escaping FirestoreErrorCompletion) {
+            // Update timestamps are stored in the public document
+            self.public.getDocuments { snapshot, error in
+                // If there's an error while fetching the document; otherwise, process the documents here
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                    return completion(error)
+                }
+                
+                // Store any possible error to complete later so that we can process all documents,
+                // if needed...
+                var error: Error?
+                for document in snapshot?.documents ?? [] {
+                    switch document.documentID {
+                    case "database":
+                        let latest = (document.data()["updates"] as? [Timestamp])?.last?.dateValue()
+                        let latestCached = Store.cache.getLatestDatabaseUpdate()
+                        if let database = latest, let cached = latestCached {
+                            let elapsed = database.timeIntervalSince(cached)
+                            if elapsed >= Store.maximumCacheAge {
+                                error = "elapsed time greater than allotted [\(elapsed) >= \(Store.maximumCacheAge)]"
                             }
-                            #endif
-                            
-                            return $0.data()
-                        })
-                        Store.cache.cache(data: data, filename: collection.collectionID)
-                        delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
+                        }
+                    // Process any other documents that might be stored in the public collection here...
+                    // case "someFutureCollection":
+                    // ...
+                    default:
+                        Store.printDebug("unhandled public document [\(document.documentID)]")
                     }
                 }
+                
+                return completion(error)
             }
+        }
+        
+        // Fetch data from the database and cache it locally.
+        // Cache automatically stores cache date, so no need to do it manually.
+        private func fetchAndCache(collection: CollectionReference, reason: String) {
+            let collectionID = collection.collectionID
+            Store.printDebug("fetching data from database for \(collectionID) [\(reason)]")
             
-            // If caching is telling us we should fetch...
-            if Store.cache.shouldFetch {
-                fetchAndCache()
-                return
+            collection.getDocuments { snapshot, error in
+                if let error = error {
+                    registerStartup(error: error)
+                } else if let snapshot = snapshot {
+                    let data = snapshot.documents.map({
+                        if let jsonData = try? JSONSerialization.data(withJSONObject: $0.data()),
+                           let json = String(data: jsonData, encoding: .utf8) {
+                            Store.printDebug("Fetched object from \(collectionID) collection: \(json)")
+                        } else {
+                            Store.printDebug("Could not serialize data from: \($0.data())")
+                        }
+                        
+                        return $0.data()
+                    })
+                    Store.cache.cache(data: data, filename: collectionID)
+                    delegate?.firestoreDidFetch(data: data, from: collectionID)
+                }
             }
-            
-            // Otherwise, attempt to fetch the cached data first
-            if let data = Store.cache.fetch(jsonFromFileNamed: collection.collectionID) {
-                delegate?.firestoreDidFetch(data: data, from: collection.collectionID)
-                return
-            }
-            
-            // If that fails, default to fetching data from the database
-            fetchAndCache()
         }
         
         private func registerStartup(error: Error) {

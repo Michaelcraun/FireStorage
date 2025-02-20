@@ -4,12 +4,11 @@ import Chronometer
 extension Store {
     public class Cache {
         private let defaults = UserDefaults(suiteName: "FireStorage")
+        private let latestDatabaseUpdateKey = "Latest_Database_Update_Date"
         
         private var files: FileManager { FileManager.default }
-        private var documents: URL { files.urls(for: .documentDirectory, in: .userDomainMask)[0] }
+        private var documents: URL { files.urls(for: .cachesDirectory, in: .userDomainMask)[0] }
         private var documentStorage: URL { return documents.appendingPathComponent("FireStorage") }
-        
-        public var shouldFetch: Bool = false
         
         // MARK: - UserDefaults support
         public func get(valueFor key: String) -> Any? {
@@ -20,25 +19,12 @@ extension Store {
             defaults?.set(value, forKey: "FireStorage_\(key)")
         }
         
-        public func setLatestUpdate(date: Date?) {
-            let key = "Last_Update_Date"
-            let tempUpdate = get(valueFor: key) as? String
-            
-            guard let date = date else {
-                set(value: nil, for: key)
-                shouldFetch = true
-                return
-            }
-            
-            if let tempUpdateDate = tempUpdate?.date() {
-                if tempUpdateDate == date {
-                    shouldFetch = false
-                    return
-                }
-            }
-            
-            set(value: date.description, for: key)
-            shouldFetch = true
+        public func getLatestDatabaseUpdate() -> Date? {
+            return (get(valueFor: latestDatabaseUpdateKey) as? String)?.date()
+        }
+        
+        public func setLatestDatabaseUpdate(date: Date?) {
+            set(value: date?.description, for: latestDatabaseUpdateKey)
         }
         
         // MARK: - File caching
@@ -59,6 +45,9 @@ extension Store {
                 let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
                 try json.write(to: path)
                 
+                // Set last cached date for this file
+                set(value: Date().description, for: key(for: filename))
+                
                 Store.printDebug("JSON successfully cached to \(path.absoluteString)")
             } catch {
                 Store.firestore.registerError(message: error.localizedDescription)
@@ -67,15 +56,17 @@ extension Store {
         
         public func fetch(jsonFromFileNamed filename: String) -> [[String : Any]]? {
             let filename = "\(filename).json"
-            let path = documentStorage.appendingPathComponent(filename)
             
-            if FileManager.default.fileExists(atPath: path.absoluteString) {
+            guard shouldFetch(filename: filename) else { return nil }
+            
+            let path = documentStorage.appendingPathComponent(filename)
+            if files.fileExists(atPath: path.absoluteString) {
                 do {
                     let data = try Data(contentsOf: path)
                     return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
                 } catch {
                     Store.firestore.registerError(message: error.localizedDescription)
-                }   
+                }
             }
             return nil
         }
@@ -84,6 +75,17 @@ extension Store {
             if files.fileExists(atPath: path.absoluteString) {
                 try files.removeItem(at: path)
             }
+        }
+        
+        private func key(for filename: String) -> String {
+            return "\(filename)_Last_Update_Date"
+        }
+        
+        private func shouldFetch(filename: String) -> Bool {
+            guard let lastUpdate = get(valueFor: key(for: filename)) as? String,
+                  let lastUpdateDate = lastUpdate.date() else { return false }
+            let distance = Date().timeIntervalSince(lastUpdateDate)
+            return distance <= Store.maximumCacheAge
         }
     }
 }
