@@ -341,7 +341,8 @@ extension CollectionReference {
                             case .removed: removed.append(object)
                             }
                         } catch {
-                            Store.firestore.registerError(message: error.localizedDescription)
+                            let errorDescription = "Unable to parse \(String(describing: T.self)) data"
+                            Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
                         }
                     }
                     
