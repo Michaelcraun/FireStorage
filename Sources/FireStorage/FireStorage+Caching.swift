@@ -59,7 +59,8 @@ extension Store {
                 
                 Store.printDebug("JSON successfully cached to \(path.absoluteString)")
             } catch {
-                Store.firestore.registerError(message: error.localizedDescription)
+                let errorDescription = "Unable to cache data at \(path)"
+                Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
             }
         }
         
@@ -76,7 +77,8 @@ extension Store {
                 let data = try Data(contentsOf: path)
                 return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
             } catch {
-                Store.firestore.registerError(message: error.localizedDescription)
+                let errorDescription = "Unable to fetch cached data at \(path)"
+                Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
             }
             return nil
         }
@@ -92,7 +94,8 @@ extension Store {
                 do {
                     try files.removeItem(at: path)
                 } catch {
-                    Store.firestore.registerError(message: error.localizedDescription)
+                    let errorDescription = "Unable to remove file at \(path)"
+                    Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
                 }
             }
         }
