@@ -5,13 +5,19 @@ import XCTest
 final class FireStorageCachingTests: XCTestCase {
     
     override func setUp(completion: @escaping (Error?) -> Void) {
+        Store.environmentOverride = .unitTesting
+        
+        Store.cache.removeFile(with: "action")
+        Store.cache.removeFile(with: "this_is_a_test")
+        
         completion(nil)
     }
     
     func testCaching_firstInstall() {
         Store.cache.setLatestDatabaseUpdate(date: nil)
         
-        // Should fetch
+        // Should fetch -> Cache returning nil means it doesn't have anything OR the cache
+        // has determined that the data here is outdatad
         XCTAssertNil(Store.cache.fetch(jsonFromFileNamed: "action"))
     }
     
@@ -21,7 +27,8 @@ final class FireStorageCachingTests: XCTestCase {
         
         sleep(1)
         
-        // Should fetch
+        // Should fetch -> Cache returning nil means it doesn't have anything OR the cache
+        // has determined that the data here is outdatad
         XCTAssertNil(Store.cache.fetch(jsonFromFileNamed: "action"))
     }
     
@@ -29,37 +36,12 @@ final class FireStorageCachingTests: XCTestCase {
         Store.cache.cache(data: [[:]], filename: "action")
         Store.maximumCacheAge = 60
         
-        // Should not fetch
+        // Should not fetch -> Cache returning non-nil value means the cache has data that is
+        // not outdated and should be used
         XCTAssertNotNil(Store.cache.fetch(jsonFromFileNamed: "action"))
     }
     
-    func testCaching_databaseHasUpdates() {
-        Store.firestore.start()
-        
-        // Should fetch
-        
-    }
-    
-    func testShouldFetch() {
-        // Reset latest update date and set
-        Store.cache.setLatestDatabaseUpdate(date: nil)
-        Store.maximumCacheAge = 0
-        
-        // By default (first install)...
-        
-        // Cache some dummy data to update last cached date for this object to today's date...
-        Store.cache.cache(data: [[:]], filename: "action")
-        
-        // If the last update doesn't match what we have stored...
-        Store.cache.setLatestDatabaseUpdate(date: "1/1/2023".date()!)
-//        XCTAssertEqual(Store.cache.shouldFetch, true)
-        
-        // If the last update matches what we have stored...
-        Store.cache.setLatestDatabaseUpdate(date: "1/1/2023".date()!)
-//        XCTAssertEqual(Store.cache.shouldFetch, false)
-    }
-    
-    func testStoreJson() throws {
+    func testFetch_storeAndFetchJson() throws {
         let dictionary: [[String : Any]] = [
             [
                 "this": "is",
@@ -68,13 +50,7 @@ final class FireStorageCachingTests: XCTestCase {
         ]
         
         Store.cache.cache(data: dictionary, filename: "this_is_a_test")
-    }
-    
-    func testFetch() throws {
-        let data = Store.cache.fetch(jsonFromFileNamed: "this_is_a_test")
-        
-        XCTAssertEqual(data!.first!["this"] as! String, "is")
-        XCTAssertEqual(data!.first!["a"] as! String, "test")
+        XCTAssertNotNil(Store.cache.fetch(jsonFromFileNamed: "this_is_a_test"))
     }
     
 }

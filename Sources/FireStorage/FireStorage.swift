@@ -38,7 +38,7 @@ public struct Store {
     @discardableResult
     public init(plist: String = "GoogleService-Info", devPlist: String? = nil) {
         switch environment {
-        case .development, .testing:
+        case .development, .testing, .unitTesting:
             Store.printDebug("This application is currently running in development!")
             if let devPlist = devPlist {
                 if let options = loadGooglePlist(named: devPlist) {

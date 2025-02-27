@@ -21,7 +21,6 @@ public var environment: Environment {
     
     guard let path = Bundle.main.appStoreReceiptURL?.path else { return .production }
     
-    #if DEBUG
     if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
         return .unitTesting
     }
@@ -30,6 +29,7 @@ public var environment: Environment {
         return .testing
     }
     
+    #if DEBUG
     return .development
     #endif
     

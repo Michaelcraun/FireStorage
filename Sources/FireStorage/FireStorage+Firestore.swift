@@ -64,6 +64,13 @@ extension Store {
             function: String = #function,
             line: Int = #line,
             completion: FirestoreErrorCompletion? = nil) {
+                if environment == .unitTesting {
+                    Store.printDebug("[WARN] Error reporting disabled while unit testing!")
+                    Store.printDebug(message)
+                    completion?(nil)
+                    return
+                }
+                
                 let error = FirestoreError(
                     error: message,
                     file: URL(fileURLWithPath: file).lastPathComponent,

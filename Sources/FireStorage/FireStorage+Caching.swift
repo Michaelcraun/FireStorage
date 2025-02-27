@@ -7,8 +7,13 @@ extension Store {
         private let latestDatabaseUpdateKey = "Latest_Database_Update_Date"
         
         private var files: FileManager { FileManager.default }
-        private var documents: URL { files.urls(for: .cachesDirectory, in: .userDomainMask)[0] }
-        private var documentStorage: URL { return documents.appendingPathComponent("FireStorage") }
+        
+        // MARK: - File and directory management
+        private func documentStorage() -> URL {
+            // We want to always store files in a ./FireStorage folder, even if we're passing in a baseDirectory
+            return files.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("FireStorage")
+        }
         
         // MARK: - UserDefaults support
         public func get(valueFor key: String) -> Any? {
@@ -27,10 +32,15 @@ extension Store {
             set(value: date?.description, for: latestDatabaseUpdateKey)
         }
         
-        // MARK: - File caching
+        // MARK: - File caching and management
         private func createDirectoryStructureIfNeeded() {
-            if !files.fileExists(atPath: documentStorage.absoluteString) {
-                try? files.createDirectory(at: documentStorage, withIntermediateDirectories: true)
+            if !files.fileExists(atPath: documentStorage().absoluteString) {
+                do {
+                    try files.createDirectory(at: documentStorage(), withIntermediateDirectories: true)
+                } catch {
+                    let errorDescription = "Could not create project directory at \(documentStorage().absoluteString)"
+                    Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
+                }
             }
         }
         
@@ -38,10 +48,9 @@ extension Store {
             createDirectoryStructureIfNeeded()
             
             let filename = "\(filename).json"
-            let path = documentStorage.appendingPathComponent(filename)
+            let path = documentStorage().appendingPathComponent(filename)
             
             do {
-                try removeFile(at: path)
                 let json = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
                 try json.write(to: path)
                 
@@ -57,23 +66,34 @@ extension Store {
         public func fetch(jsonFromFileNamed filename: String) -> [[String : Any]]? {
             let filename = "\(filename).json"
             
-            guard shouldFetch(filename: filename) else { return nil }
+            guard shouldFetch(filename: filename) else {
+                removeFile(with: filename)
+                return nil
+            }
             
-            let path = documentStorage.appendingPathComponent(filename)
-            if files.fileExists(atPath: path.absoluteString) {
-                do {
-                    let data = try Data(contentsOf: path)
-                    return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
-                } catch {
-                    Store.firestore.registerError(message: error.localizedDescription)
-                }
+            let path = documentStorage().appendingPathComponent(filename)
+            do {
+                let data = try Data(contentsOf: path)
+                return try JSONSerialization.jsonObject(with: data) as? [[String : Any]]
+            } catch {
+                Store.firestore.registerError(message: error.localizedDescription)
             }
             return nil
         }
         
-        private func removeFile(at path: URL) throws {
+        public func removeFile(with name: String) {
+            let modName = name.contains(".json") ? name : "\(name).json"
+            let path = documentStorage().appendingPathComponent(modName)
+            removeFile(at: path)
+        }
+        
+        private func removeFile(at path: URL) {
             if files.fileExists(atPath: path.absoluteString) {
-                try files.removeItem(at: path)
+                do {
+                    try files.removeItem(at: path)
+                } catch {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                }
             }
         }
         
