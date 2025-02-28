@@ -26,6 +26,7 @@ public struct Store {
     /// - warning: Regardless of status, errors will always be logged to the Firestore instance!
     public static var verboseLoggingEnabled: Bool = true
     private static let verboseLoggingKey: String = "Verbose_Logging_Disabled_Reported"
+    private static var verboseLoggingDisabledReported: Int = 0
     
     // MARK: File Caching
     /// A boolean toggle determining if file caching is enabled (enabled by default). If enabled, FireStorage will cache data
@@ -63,9 +64,9 @@ public struct Store {
         Store.cache.set(value: 0, for: Store.verboseLoggingKey)
     }
     
-    public static func printDebug(_ message: String) {
+    public static func printDebug(_ message: String, shouldOverride: Bool = false) {
         #if DEBUG
-        if Store.verboseLoggingEnabled {
+        if Store.verboseLoggingEnabled || shouldOverride {
             print("FireStorage:", message)
         } else {
             reportVerboseLoggingDisabled()
@@ -80,8 +81,8 @@ public struct Store {
     
     public static func reportVerboseLoggingDisabled() {
         guard Store.cache.get(valueFor: verboseLoggingKey) as? Int == 0 else { return }
-        Store.printDebug("WARNING: Verbose logging is disabled.")
-        Store.printDebug("Errors encountered will not be logged to the database.")
+        Store.printDebug("WARNING: Verbose logging is disabled.", shouldOverride: true)
+        Store.printDebug("Errors encountered will not be logged to the database.", shouldOverride: true)
         Store.cache.set(value: 1, for: verboseLoggingKey)
     }
     

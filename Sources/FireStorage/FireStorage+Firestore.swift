@@ -341,7 +341,7 @@ extension CollectionReference {
                             case .removed: removed.append(object)
                             }
                         } catch {
-                            let errorDescription = "Unable to parse \(String(describing: T.self)) data"
+                            let errorDescription = "Unable to parse \(String(describing: T.self)) data for \(change.document.documentID)"
                             Store.firestore.registerError(message: "\(errorDescription) [\(error.localizedDescription)]")
                         }
                     }
