@@ -1,4 +1,5 @@
 import Firebase
+import FirebaseAnalytics
 import Foundation
 
 public struct Store {
@@ -62,6 +63,10 @@ public struct Store {
             }
         }
         Store.cache.set(value: 0, for: Store.verboseLoggingKey)
+    }
+    
+    public static func enableAnalytics() {
+        let _ = Analytics.self
     }
     
     public static func printDebug(_ message: String, shouldOverride: Bool = false) {
