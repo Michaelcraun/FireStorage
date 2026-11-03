@@ -117,7 +117,7 @@ extension Store {
             type: T.Type,
             completion: @escaping AuthSignInCompletion<T>) {
                 if let appleToken = credential.identityToken, let token = String(data: appleToken, encoding: .utf8) {
-                    let cred = OAuthProvider.credential(withProviderID: "apple.com", idToken: token, rawNonce: nonce)
+                    let cred = OAuthProvider.appleCredential(withIDToken: token, rawNonce: nonce, fullName: credential.fullName)
                     auth.signIn(with: cred) { (result, error) in
                         if let error = error {
                             Store.firestore.registerError(message: error.localizedDescription)
@@ -186,8 +186,8 @@ extension Store {
             }
         }
         
-        public func errorCode(from error: Error) -> AuthErrorCode.Code? {
-            return AuthErrorCode.Code(rawValue: error._code)
+        public func errorCode(from error: Error) -> AuthErrorCode? {
+            return AuthErrorCode(rawValue: error._code)
         }
     }
 }

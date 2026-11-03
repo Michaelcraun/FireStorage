@@ -6,7 +6,6 @@
 //
 
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 
 extension Store {
     public typealias FirestoreBooleanCompletion = (Bool, Error?) -> Void
