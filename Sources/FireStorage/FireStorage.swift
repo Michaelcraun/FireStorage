@@ -68,7 +68,16 @@ public struct Store {
     public static func enableAnalytics() {
         let _ = Analytics.self
     }
-    
+
+    /// Logs a custom Firebase Analytics event.
+    /// - Parameters:
+    ///   - name: The event name (letters, digits and underscores; must start with a letter; max 40 characters).
+    ///   - parameters: Optional event parameters (keys follow the same rules as `name`).
+    public static func logEvent(_ name: String, parameters: [String: Any]? = nil) {
+        Analytics.logEvent(name, parameters: parameters)
+        Store.printDebug("Logged analytics event: \(name) \(parameters ?? [:])")
+    }
+
     public static func printDebug(_ message: String, shouldOverride: Bool = false) {
         #if DEBUG
         if Store.verboseLoggingEnabled || shouldOverride {
