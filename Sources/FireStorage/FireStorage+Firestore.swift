@@ -45,6 +45,7 @@ extension Store {
         
         // MARK: - Characters
         public var characters: CollectionReference { firestore.collection("character") }
+
         
         // MARK: - Application
         public var errors: CollectionReference { firestore.collection("error") }
@@ -221,40 +222,6 @@ extension CollectionReference {
     public typealias FirestoreObserveCompletion<T:Codable> = (_ new: [T]?, _ updated: [T]?, _ removed: [T]?, _ error: Error?) -> Void
     
     public func get<T:Codable>(
-        ofType type: T.Type,
-        completion: @escaping FirestoreGetArrayCompletion<T>) {
-            self.getDocuments { snapshot, error in
-                if let error = error {
-                    Store.firestore.registerError(message: error.localizedDescription)
-                    completion(nil, error)
-                } else if let snapshot = snapshot {
-                    var errors: [String] = []
-                    let objects: [T] = snapshot.documents.compactMap({
-                        do {
-                            let value = try $0.data(as: type)
-                            return value
-                        } catch {
-                            errors.append(error.localizedDescription)
-                            return nil
-                        }
-                    })
-                    
-                    if errors.isEmpty {
-                        completion(objects, nil)
-                    } else {
-                        let combined = errors.joined(separator: ",")
-                        let error = "Encountered errors while fetching documents from \(self.collectionID): \(combined)"
-                        Store.firestore.registerError(message: error)
-                        completion(objects, error)
-                    }
-                } else {
-                    Store.firestore.registerError(message: "No data available for \(self.collectionID)")
-                    completion(nil, "No data available for \(self.collectionID)")
-                }
-            }
-        }
-    
-    public func get<T:Codable>(
         dataWithId id: String,
         ofType type: T.Type,
         completion: @escaping FirestoreGetCompletion<T>) {
@@ -278,9 +245,16 @@ extension CollectionReference {
         }
     
     #warning("Should this be updated to handle arrays?")
+    /// Encodes `data` and writes it to a document in this collection.
+    /// - Parameters:
+    ///   - id: The document ID; a new one is generated when `nil`.
+    ///   - merge: When `true` (the default), fields are merged into any existing document, so fields that
+    ///     are `nil` in `data` keep their old values. Pass `false` to replace the document entirely, e.g. when
+    ///     saving an edited object whose optional fields may have been cleared.
     public func put<T:Codable>(
         data: T,
         forId id: String? = nil,
+        merge: Bool = true,
         completion: FirestorePutCompletion? = nil) {
             let documentId = id ?? self.document().documentID
             let document = self.document(documentId)
@@ -288,7 +262,7 @@ extension CollectionReference {
             do {
                 let encoded = try JSONEncoder().encode(data)
                 if let json = try JSONSerialization.jsonObject(with: encoded, options: .fragmentsAllowed) as? [String : Any] {
-                    document.setData(json, merge: true) { error in
+                    document.setData(json, merge: merge) { error in
                         if let error = error {
                             Store.firestore.registerError(message: error.localizedDescription)
                         }
@@ -366,6 +340,47 @@ extension CollectionReference {
 
 // MARK: - Query Helpers
 extension Query {
+    /// The collection this query reads from, for error messages.
+    fileprivate var collectionName: String {
+        return (self as? CollectionReference)?.collectionID ?? "query"
+    }
+    
+    /// Fetches and decodes every document matching this query (or every document in a collection).
+    /// Documents that fail to decode are skipped and reported in the error.
+    public func get<T:Codable>(
+        ofType type: T.Type,
+        completion: @escaping CollectionReference.FirestoreGetArrayCompletion<T>) {
+            self.getDocuments { snapshot, error in
+                if let error = error {
+                    Store.firestore.registerError(message: error.localizedDescription)
+                    completion(nil, error)
+                } else if let snapshot = snapshot {
+                    var errors: [String] = []
+                    let objects: [T] = snapshot.documents.compactMap({
+                        do {
+                            let value = try $0.data(as: type)
+                            return value
+                        } catch {
+                            errors.append(error.localizedDescription)
+                            return nil
+                        }
+                    })
+                    
+                    if errors.isEmpty {
+                        completion(objects, nil)
+                    } else {
+                        let combined = errors.joined(separator: ",")
+                        let error = "Encountered errors while fetching documents from \(self.collectionName): \(combined)"
+                        Store.firestore.registerError(message: error)
+                        completion(objects, error)
+                    }
+                } else {
+                    Store.firestore.registerError(message: "No data available for \(self.collectionName)")
+                    completion(nil, "No data available for \(self.collectionName)")
+                }
+            }
+        }
+    
     public typealias FirestoreObserveCompletion<T:Codable> = ([T]?, [T]?, [T]?, Error?) -> Void
     
     public func observe<T:Codable>(
