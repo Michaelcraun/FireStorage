@@ -169,13 +169,15 @@ extension Store {
             }
         }
         
-        // Fetch data from the database and cache it locally.
+        // Fetch core data from the database and cache it locally.
         // Cache automatically stores cache date, so no need to do it manually.
+        // Only documents with `source == "core"` are fetched: user-created entries share these collections,
+        // and each user's own entries are fetched separately by the app (they're never cached here).
         private func fetchAndCache(collection: CollectionReference, reason: String) {
             let collectionID = collection.collectionID
             Store.printDebug("fetching data from database for \(collectionID) [\(reason)]")
             
-            collection.getDocuments { snapshot, error in
+            collection.whereField("source", isEqualTo: "core").getDocuments { snapshot, error in
                 if let error = error {
                     registerStartup(error: error)
                 } else if let snapshot = snapshot {
