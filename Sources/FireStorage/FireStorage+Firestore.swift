@@ -121,7 +121,9 @@ extension Store {
                 
                 // Caching automatically handles when we need to not use cached data, so use
                 // the data that comes back from fetching from the cache, if we have it...
-                if let cached = Store.cache.fetch(jsonFromFileNamed: collection.collectionID) {
+                // An empty cache is treated as missing: older versions cached empty results after an
+                // offline first launch, which left the app stuck on the splash screen.
+                if let cached = Store.cache.fetch(jsonFromFileNamed: collection.collectionID), !cached.isEmpty {
                     self.delegate?.firestoreDidFetch(data: cached, from: collection.collectionID)
                     return
                 }
@@ -179,6 +181,10 @@ extension Store {
             collection.whereField("source", isEqualTo: "core").getDocuments { snapshot, error in
                 if let error = error {
                     registerStartup(error: error)
+                } else if let snapshot = snapshot, snapshot.documents.isEmpty {
+                    // Offline with nothing cached, Firestore returns an empty result instead of an error.
+                    // Don't cache it (that would stick until the cache expires); report it so the app can retry.
+                    registerStartup(error: "No data available for \(collectionID) [fromCache: \(snapshot.metadata.isFromCache)]")
                 } else if let snapshot = snapshot {
                     let data = snapshot.documents.map({
                         if let jsonData = try? JSONSerialization.data(withJSONObject: $0.data()),
@@ -190,7 +196,10 @@ extension Store {
                         
                         return $0.data()
                     })
-                    Store.cache.cache(data: data, filename: collectionID)
+                    // Only cache server data, so stale local results don't reset the cache date.
+                    if !snapshot.metadata.isFromCache {
+                        Store.cache.cache(data: data, filename: collectionID)
+                    }
                     delegate?.firestoreDidFetch(data: data, from: collectionID)
                 }
             }
